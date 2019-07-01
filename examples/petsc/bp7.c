@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
   CeedInt lenloc = pow(2,dim);
   printf("len %d len3 %d\n", len, len3);
   PetscScalar xx,yy,zz;
-  PetscInt    ix,iy,iz;
+  PetscInt    ix,iy,iz, tx,ty,tz;
   PetscInt offset=cEnd-cStart;
   xloc = malloc(len3*sizeof(xloc[0]));
   ierr = PetscPrintf(comm, " Total number vertices %d, cells %d \n", vEnd-vStart, cEnd-cStart);CHKERRQ(ierr);
@@ -298,16 +298,19 @@ int main(int argc, char **argv) {
                 printf("numindices %d \n",numindices);
                 // writing this super explicitly, in case there are still issues
                 for (j = 0; j < lenloc; j++){
-                   xx=coordArray[dim*(j+ic)];
-                   yy=coordArray[dim*(j+ic)+1];
-                   zz=coordArray[dim*(j+ic)+2];
+                   tx=dim*(indices[j]);
+                   ty=dim*(indices[j])+1;
+                   tz=dim*(indices[j])+2;
+                   xx=coordArray[dim*(indices[j])];
+                   yy=coordArray[dim*(indices[j])+1];
+                   zz=coordArray[dim*(indices[j])+2];
                    ix=(indices[j])+len*0;
 		   iy=(indices[j])+len*1;
 	           iz=(indices[j])+len*2;
                    xloc[ix]=xx;
                    xloc[iy]=yy;
                    xloc[iz]=zz;
-                   ierr = PetscPrintf(comm, "x(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)  ind(%d)=%d, cell %d \n", ix, iy,iz, xx,yy,zz, j, indices[j], ic);CHKERRQ(ierr); 
+                   ierr = PetscPrintf(comm, "x(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)  ind(%d)=%d, cell %d \n", tx, ty,tz, xx,yy,zz, j, indices[j], ic);CHKERRQ(ierr); 
                 }
                ierr = DMPlexRestoreClosureIndices(dm,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
                counter++;
