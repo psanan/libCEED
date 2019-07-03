@@ -29,38 +29,43 @@ const char help[] = "Solve CEED BP1 using PETSc\n";
 #include "bp4.h"
 
 static int CreateRestrictionPlex(Ceed ceed, const CeedInt melem[3], CeedInt P, CeedInt ncomp,
-				 CeedElemRestriction *Erestrict, DM dm) {
+				 CeedElemRestriction *Erestrict, DM dm, PetscSection section, PetscInt leng) {
 
   const PetscInt Nelem = melem[0]*melem[1]*melem[2];
   PetscInt mdof[3];//, *idx, *idxp;
-  PetscSection   section;
-  PetscInt       c, cStart, cEnd;
+  PetscInt       v, c, cStart, cEnd, offset;
   PetscSpace     sp; 
   PetscFE        fe;
-  PetscInt numindices,*indices;
+  PetscInt numindices,*indices, *ceedind;
   PetscInt       ierr;
-
-  PetscInt       dim;
+  PetscInt       dim, len;
 
   DMGetDimension(dm, &dim);
   ierr = PetscFECreateDefault(PETSC_COMM_SELF,dim,1,PETSC_FALSE,NULL,PETSC_DETERMINE,&fe);CHKERRQ(ierr);
  
-  ierr = DMGetDefaultSection(dm,&section);CHKERRQ(ierr);
+  //ierr = DMGetDefaultSection(dm,&section);CHKERRQ(ierr);
   ierr = DMPlexGetHeightStratum(dm,0,&cStart,&cEnd);CHKERRQ(ierr);
+  offset=cEnd-cStart;
 
   ierr = DMAddField(dm,NULL,(PetscObject)fe);CHKERRQ(ierr);
   ierr = PetscFEGetBasisSpace(fe, &sp);
   ierr = PetscSpaceSetDegree(sp, P, P);
+
+  len=pow(2,dim);
+  for (int d=0; d<3; d++) mdof[d] = melem[d]*(P-1) + 1;
+  ceedind=malloc(leng*sizeof ceedind[0]);
  
    for (c=cStart; c<cEnd; c++) {
     ierr = DMPlexSetClosurePermutationTensor(dm,c,section);CHKERRQ(ierr);
     ierr = DMPlexGetClosureIndices(dm,section,section,c,&numindices,&indices,NULL);CHKERRQ(ierr);
-    ierr = DMPlexRestoreClosureIndices(dm,section,section,c,&numindices,&indices,NULL);CHKERRQ(ierr);
+    for (v=0; v<len; v++) 
+         {  ceedind[v+c*len]=indices[v];
+            printf("indices[%d]=%d \n", v, indices[v]);}
+    ierr = DMPlexRestoreClosureIndices(dm,section,section,c,&numindices,&indices,NULL);CHKERRQ(ierr); 
   }
   
-  for (int d=0; d<3; d++) mdof[d] = melem[d]*(P-1) + 1;
   CeedElemRestrictionCreate(ceed, Nelem, P*P*P, mdof[0]*mdof[1]*mdof[2], ncomp,
-                            CEED_MEM_HOST, CEED_OWN_POINTER, indices, Erestrict);
+                            CEED_MEM_HOST, CEED_OWN_POINTER, ceedind, Erestrict);
   //printf("Nelem %d, mdof %d, p %d, ncomp %d \n",Nelem, mdof[0]*mdof[1]*mdof[2], P, ncomp);
   PetscFunctionReturn(0);
 }
@@ -151,7 +156,8 @@ int main(int argc, char **argv) {
   PetscInt ierr;
   MPI_Comm comm;
   char ceedresource[4096] = "/cpu/self/ref/serial";
-  PetscInt degree, qextra, localelem, melem[3] = {2, 1, 1}, lsize, gsize;
+  PetscInt degree, qextra, localelem, melem[3] = {2, 2, 2};
+  PetscInt       lencoords, lsize, gsize;
   PetscScalar *r;
   PetscBool test_mode, benchmark_mode;
   DM             dm;
@@ -217,60 +223,36 @@ int main(int argc, char **argv) {
 
   //I keep for now both, different things initialized
   ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD,dim,PETSC_FALSE,melem,NULL,NULL,NULL,PETSC_TRUE,&dm);CHKERRQ(ierr);
-  P = degree + 1;
-  Q = P + qextra;
-  CeedBasisCreateTensorH1Lagrange(ceed, 3, 1, P, Q, CEED_GAUSS, &basisu);
-  CeedBasisCreateTensorH1Lagrange(ceed, 3, 3, 2, Q, CEED_GAUSS, &basisx);
-   
-  //CeedInt ndof2,nqpt2;
-  //ierr = CeedBasisGetNumNodes(basisu, &ndof2); //CeedChk(ierr);
-  //ierr = CeedBasisGetNumQuadraturePoints(basisu, &nqpt2); //CeedChk(ierr);
-  //printf("basis ndof %d, nqpt %d\n", ndof2, nqpt2);
-  
-  CreateRestrictionPlex(ceed, melem, 2, 3, &Erestrictx, dm);
-  CreateRestrictionPlex(ceed, melem, P, 1, &Erestrictu, dm);
- 
-  CeedInt nelem = melem[0]*melem[1]*melem[2];
-  CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
-                                    &Erestrictui);
-  CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
-                                    &Erestrictxi);
-
-  /*
-   CeedInt  xdof, udof;
-  CeedElemRestrictionGetNumComponents(Erestrictx,&xdof);
-  CeedElemRestrictionGetNumComponents(Erestrictui,&udof);
-  printf("restriction dofs, xdof %d, udof %d, nelem %d \n",xdof,udof, nelem);
-   */
-
-  //ierr = DMPlexCreateFromFile(comm, "3Dbrick4els.exo", dmInterp, &dm);CHKERRQ(ierr);
+   //ierr = DMPlexCreateFromFile(PETSC_COMM_WORLD, "3Dbrick4els.exo", dmInterp, &dm);CHKERRQ(ierr);
   ierr = DMSetFromOptions(dm);CHKERRQ(ierr);
+  ierr = DMGetDimension(dm, &dim); CHKERRQ(ierr);
 
+  // Create valid section
   numFields = 1;
   numComp[0] = 1;
   for (PetscInt k = 0; k < numFields*(dim+1); ++k){numDOF[k] = 0;}
   numDOF[0] = 1;
   numBC = 0;
 
-  // Please note that bcField stays uninitialized because numBC = 0,
-  // therefore having a trash value. This is probably handled internally
-  // within DMPlexCreateSection but idk how exactly.
+  //Popoulate DM
   ierr = DMGetStratumIS(dm, "depth", 2, &bcPointsIS);CHKERRQ(ierr);
   ierr = DMSetNumFields(dm, numFields);CHKERRQ(ierr);
   ierr = DMPlexCreateSection(dm, NULL, numComp, numDOF, numBC, bcField, NULL, &bcPointsIS, NULL, &section);CHKERRQ(ierr);
   ierr = ISDestroy(&bcPointsIS);CHKERRQ(ierr);
   ierr = DMSetSection(dm, section);CHKERRQ(ierr);
 
-  DMGetDimension(dm, &dim);
   ierr = PetscFECreateDefault(PETSC_COMM_SELF,dim,1,PETSC_FALSE,NULL,PETSC_DETERMINE,&fe);CHKERRQ(ierr);
-  ierr = DMPlexSetClosurePermutationTensor(dm,PETSC_DETERMINE,NULL);CHKERRQ(ierr);
-  ierr = DMPlexGetHeightStratum(dm,0,&cStart,&cEnd);CHKERRQ(ierr);
-
-  PetscInt Pgrid = 2;
+  
   ierr = DMAddField(dm,NULL,(PetscObject)fe);CHKERRQ(ierr);
-  ierr = PetscFEGetBasisSpace(fe, &sp); // fake FE I should be able to get rid of it
-  ierr = PetscSpaceSetDegree(sp, Pgrid, Pgrid);
+
+  //Build Local and global vectors to access correct sizes 
+  DMCreateGlobalVector(dm,&X);
+  DMCreateLocalVector(dm,&Xloc);
  
+  VecGetLocalSize(X,&lsize);
+  VecGetSize(X, &gsize); 
+  
+  // Start reading geometry and restoring order
   ierr = DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);CHKERRQ(ierr);
   ierr = DMGetStratumIS(dm, "depth", 0, &verts);CHKERRQ(ierr);
   ierr = ISGetIndices(verts, &vertids);CHKERRQ(ierr);
@@ -279,63 +261,52 @@ int main(int argc, char **argv) {
   ierr = DMGetStratumIS(dm, "depth", 3, &cells);CHKERRQ(ierr);
   ierr = ISGetIndices(cells, &cellids);CHKERRQ(ierr);
 
-        /*	Get Local Coordinates	*/
   ierr = DMGetCoordinatesLocal(dm, &coords);CHKERRQ(ierr);
   ierr = VecGetArray(coords,&coordArray);CHKERRQ(ierr);
- 
-  CeedInt  len3; 
-  ierr = VecGetSize(coords,&len3);CHKERRQ(ierr);
-  PetscInt len=floor(len3/dim);
+
+  ierr = VecGetSize(coords,&lencoords);CHKERRQ(ierr);
+  
   CeedScalar *xloc;
   CeedInt lenloc = pow(2,dim);
-  printf("len %d len3 %d\n", len, len3);
-  PetscScalar xx,yy,zz;
-  PetscInt    ix,iy,iz, tx,ty,tz;
-  PetscInt offset=cEnd-cStart;
-  xloc = malloc(len3*sizeof(xloc[0]));
+ 
+  xloc = malloc(lencoords*sizeof(xloc[0]));
   ierr = PetscPrintf(comm, " Total number vertices %d, cells %d \n", vEnd-vStart, cEnd-cStart);CHKERRQ(ierr);
+  ierr = PetscPrintf(comm, " Local size  %d, Coordinates local size %d \n", lsize, lencoords);CHKERRQ(ierr);
     for (ic = 0; ic < cEnd-cStart; ic++) 
 	{ 	ierr = DMPlexSetClosurePermutationTensor(dm,ic,section);CHKERRQ(ierr);
                 ierr = DMPlexGetClosureIndices(dm,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
-                printf("numindices %d, cellids[%d] %d \n",numindices, ic, cellids[ic]);
+                printf("Numindices %d, current cell %d \n",numindices, ic);
                 // writing this super explicitly, in case there are still issues
                 for (j = 0; j < lenloc; j++){
-                   tx=dim*(indices[j]);
-                   ty=dim*(indices[j])+1;
-                   tz=dim*(indices[j])+2;
-                   xx=coordArray[dim*(indices[j])];
-                   yy=coordArray[dim*(indices[j])+1];
-                   zz=coordArray[dim*(indices[j])+2];
-                   ix=j+len*0;
-		   iy=j+len*1;
-	           iz=j+len*2;
-                   xloc[ix]=xx;
-                   xloc[iy]=yy;
-                   xloc[iz]=zz;
-                   ierr = PetscPrintf(comm, "xloc(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)  ind(%d)=%d, cell %d \n", ix, iy,iz, xx,yy,zz, j, indices[j], ic);CHKERRQ(ierr); 
+                   xloc[indices[j]+lsize*0]=coordArray[dim*(indices[j])];
+                   xloc[indices[j]+lsize*1]=coordArray[dim*(indices[j])+1];
+                   xloc[indices[j]+lsize*2]=coordArray[dim*(indices[j])+1];
+                   ierr = PetscPrintf(comm, "xloc(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f),  ind(%d)=%d, cell %d \n", indices[j]+lsize*0, indices[j]+lsize*1,indices[j]+lsize*2, coordArray[dim*(indices[j])], coordArray[dim*(indices[j])+1], coordArray[dim*(indices[j])+2], j, indices[j], ic);CHKERRQ(ierr); 
                 }
                ierr = DMPlexRestoreClosureIndices(dm,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
                counter++;
         }
    
-  CeedVectorCreate(ceed, len3, &xcoord);
-  CeedInt     nnn;  
-  CeedVectorGetLength(xcoord, &nnn);
-  printf("Length of xcoord is %d \n",nnn);
-
+  CeedVectorCreate(ceed, lencoords, &xcoord);
   CeedVectorSetArray(xcoord, CEED_MEM_HOST, CEED_OWN_POINTER, xloc);
-
-  //ierr = PetscFEGetBasisSpace(fe, &sp);
-  //ierr = PetscSpaceSetDegree(sp, P, P);
-
-  DMCreateGlobalVector(dm,&X);
-  DMCreateLocalVector(dm,&Xloc);
+  
+  P = degree + 1;
+  Q = P + qextra;
+  CeedBasisCreateTensorH1Lagrange(ceed, 3, 1, P, Q, CEED_GAUSS, &basisu);
+  CeedBasisCreateTensorH1Lagrange(ceed, 3, 3, 2, Q, CEED_GAUSS, &basisx);
+   
+  
+  CreateRestrictionPlex(ceed, melem, 2, 3, &Erestrictx, dm,section,lencoords);
+  CreateRestrictionPlex(ceed, melem, P, 1, &Erestrictu, dm,section,lsize);
  
-  PetscInt Xlocsize;
-  VecGetSize(Xloc,&Xlocsize);
-  VecGetLocalSize(X,&lsize);
-  VecGetSize(X, &gsize); 
- 
+  CeedInt nelem = melem[0]*melem[1]*melem[2];
+  CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
+                                    &Erestrictui);
+  CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
+                                    &Erestrictxi);
+
+
+
   // Create the Q-function that builds the mass operator (i.e. computes its
   // quadrature data) and set its context data.
   CeedQFunctionCreateInterior(ceed, 1,
@@ -429,18 +400,20 @@ int main(int argc, char **argv) {
   PetscInt ntest,ntestt;
   CeedScalar *testo;
 
-  CeedVectorGetLength(xcoord,&ntest);
-  CeedVectorGetLength(rho, &ntestt);
-  //CeedVectorGetArrayRead(rho, CEED_MEM_HOST, &testo);
-  printf("Length of rho is %d, length of xcoord %d, gsize %d, Xlocsize %d \n",ntestt, ntest,gsize,Xlocsize);
-  //for (CeedInt i=0; i<ntestt; i++) {
-  //printf("rho[%d] is %f, and length is %d \n",i,testo[i],ntestt);
-  //}
-  //CeedVectorRestoreArrayRead(rho, &testo);
   //exit(1);
   // Setup rho, rhs, and target
   CeedOperatorApply(op_setup, xcoord, rho, CEED_REQUEST_IMMEDIATE);
   ierr = CeedVectorSyncArray(rhsceed, CEED_MEM_HOST); CHKERRQ(ierr);
+
+  
+  CeedVectorGetLength(xcoord,&ntest);
+  CeedVectorGetLength(rho, &ntestt);
+  CeedVectorGetArrayRead(rho, CEED_MEM_HOST, &testo);
+  printf("Length of rho is %d, length of xcoord %d, gsize %d\n",ntestt, ntest,gsize);
+  for (CeedInt i=0; i<ntestt; i++) {
+  printf("rho[%d] is %f, and length is %d \n",i,testo[i],ntestt);
+  }
+  CeedVectorRestoreArrayRead(rho, &testo);
   CeedVectorDestroy(&xcoord);
   // Gather RHS
   ierr = VecRestoreArray(rhsloc, &r); CHKERRQ(ierr);
