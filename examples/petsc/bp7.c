@@ -44,7 +44,7 @@ static int CreateRestrictionPlex(Ceed ceed, const CeedInt melem[3], CeedInt P, C
 
   DMGetDimension(dm, &dim);
   ierr = PetscFECreateDefault(PETSC_COMM_SELF,dim,1,PETSC_FALSE,NULL,PETSC_DETERMINE,&fe);CHKERRQ(ierr);
-  ierr = DMPlexSetClosurePermutationTensor(dm,PETSC_DETERMINE,NULL);CHKERRQ(ierr);
+ 
   ierr = DMGetDefaultSection(dm,&section);CHKERRQ(ierr);
   ierr = DMPlexGetHeightStratum(dm,0,&cStart,&cEnd);CHKERRQ(ierr);
 
@@ -53,6 +53,7 @@ static int CreateRestrictionPlex(Ceed ceed, const CeedInt melem[3], CeedInt P, C
   ierr = PetscSpaceSetDegree(sp, P, P);
  
    for (c=cStart; c<cEnd; c++) {
+    ierr = DMPlexSetClosurePermutationTensor(dm,c,section);CHKERRQ(ierr);
     ierr = DMPlexGetClosureIndices(dm,section,section,c,&numindices,&indices,NULL);CHKERRQ(ierr);
     ierr = DMPlexRestoreClosureIndices(dm,section,section,c,&numindices,&indices,NULL);CHKERRQ(ierr);
   }
@@ -150,7 +151,7 @@ int main(int argc, char **argv) {
   PetscInt ierr;
   MPI_Comm comm;
   char ceedresource[4096] = "/cpu/self/ref/serial";
-  PetscInt degree, qextra, localelem, melem[3] = {2, 2, 2}, lsize, gsize;
+  PetscInt degree, qextra, localelem, melem[3] = {2, 1, 1}, lsize, gsize;
   PetscScalar *r;
   PetscBool test_mode, benchmark_mode;
   DM             dm;
@@ -294,8 +295,9 @@ int main(int argc, char **argv) {
   xloc = malloc(len3*sizeof(xloc[0]));
   ierr = PetscPrintf(comm, " Total number vertices %d, cells %d \n", vEnd-vStart, cEnd-cStart);CHKERRQ(ierr);
     for (ic = 0; ic < cEnd-cStart; ic++) 
-	{ 	ierr = DMPlexGetClosureIndices(dm,section,section,cellids[ic],&numindices,&indices,NULL);CHKERRQ(ierr);
-                printf("numindices %d \n",numindices);
+	{ 	ierr = DMPlexSetClosurePermutationTensor(dm,ic,section);CHKERRQ(ierr);
+                ierr = DMPlexGetClosureIndices(dm,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
+                printf("numindices %d, cellids[%d] %d \n",numindices, ic, cellids[ic]);
                 // writing this super explicitly, in case there are still issues
                 for (j = 0; j < lenloc; j++){
                    tx=dim*(indices[j]);
@@ -304,13 +306,13 @@ int main(int argc, char **argv) {
                    xx=coordArray[dim*(indices[j])];
                    yy=coordArray[dim*(indices[j])+1];
                    zz=coordArray[dim*(indices[j])+2];
-                   ix=(indices[j])+len*0;
-		   iy=(indices[j])+len*1;
-	           iz=(indices[j])+len*2;
+                   ix=j+len*0;
+		   iy=j+len*1;
+	           iz=j+len*2;
                    xloc[ix]=xx;
                    xloc[iy]=yy;
                    xloc[iz]=zz;
-                   ierr = PetscPrintf(comm, "x(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)  ind(%d)=%d, cell %d \n", tx, ty,tz, xx,yy,zz, j, indices[j], ic);CHKERRQ(ierr); 
+                   ierr = PetscPrintf(comm, "xloc(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)  ind(%d)=%d, cell %d \n", ix, iy,iz, xx,yy,zz, j, indices[j], ic);CHKERRQ(ierr); 
                 }
                ierr = DMPlexRestoreClosureIndices(dm,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
                counter++;
