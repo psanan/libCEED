@@ -25,6 +25,7 @@
 /// Mass operator example using PETSc
 const char help[] = "Solve CEED BP1 using PETSc\n";
 
+#include <stdbool.h>
 #include "bp4.h"
 #include <petscdmplex.h>
 #include <petscksp.h>
@@ -66,6 +67,7 @@ static int CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp,
 typedef struct User_ *User;
 struct User_ {
   MPI_Comm comm;
+  VecScatter ltog;
   Vec Xloc, Yloc;
   CeedVector xceed, yceed;
   CeedOperator op;
@@ -177,6 +179,9 @@ int main(int argc, char **argv) {
                           "Benchmarking mode (prints benchmark statistics)",
                           NULL, benchmark_mode, &benchmark_mode, NULL);
   CHKERRQ(ierr);
+  degree = 1;// test_mode ? 3 : 1;
+  ierr = PetscOptionsInt("-petscspace_degree", "Polynomial degree of tensor product basis",
+                         NULL, degree, &degree, NULL); CHKERRQ(ierr);
   //gotta change this eventually
   qextra = 0;
   ierr = PetscOptionsInt("-qextra", "Number of extra quadrature points",
@@ -375,6 +380,7 @@ int main(int argc, char **argv) {
   CeedVectorSetArray(rhsceed, CEED_MEM_HOST, CEED_USE_POINTER, r);
 
   PetscInt ntest,ntestt;
+  CeedScalar *testo;
 
   CeedVectorGetLength(xcoord,&ntest);
   CeedVectorGetLength(rho, &ntestt);
@@ -433,6 +439,7 @@ int main(int argc, char **argv) {
       CHKERRQ(ierr);
     }
   }
+/*
   {
     PetscReal maxerror;
     ierr = ComputeErrorMax(user, op_error, X, target, &maxerror); CHKERRQ(ierr);
@@ -441,6 +448,7 @@ int main(int argc, char **argv) {
       CHKERRQ(ierr);
     }
   }
+*/
   ierr = VecDestroy(&rhs); CHKERRQ(ierr);
   ierr = VecDestroy(&rhsloc); CHKERRQ(ierr);
   ierr = VecDestroy(&X); CHKERRQ(ierr);
