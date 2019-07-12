@@ -1,0 +1,96 @@
+# Configuration for the step cylinders
+# - x and y dimensions of the box around the cylinder 
+#
+#                (top border)
+#                     ^
+#                     |
+#                    yl2
+#                     |
+#                     v
+# (inflow)<- xl1 -> (cyl) <- xl2 ->(outflow)
+#                     ^
+#                     |
+#                    yl1 
+#                     |
+#                     v
+#               (bottom border)
+#   (cyl) denotes the axis of the cylinders
+#
+# - radius and height (in z direction) of cylinder 1 are denoted r1 and h1
+# - radius and height (in z direction) of cylinder 2 are denoted r2 and h2
+# /!\ Constraints !!!
+# - r1>r2 
+# - xl1,xl2,yl1,yl2>2*r1 
+ 
+set node constraint on
+
+# Variables
+#  geometry
+#{h1=2}
+#{h2=2}
+#{r1=1}
+#{r2=0.5}
+#{xl1=5}
+#{xl2=20}
+#{yl1=5}
+#{yl2=5}
+
+#  mesh constraints
+#{nx=38}
+#{ny=15}
+#{nz=6}
+#{ncirc=20}
+#{nr=4}
+
+# Geometry
+create brick x {xl1+xl2} y {yl1+yl2} z {h1+h2}
+move volume 1 x {xl2/2-xl1/2} y {yl2/2-yl1/2} z {h1/2-h2/2}
+create cylinder rad {2*r1} height {h1+h2}
+move volume 2 z {h1/2-h2/2}
+subtract volume 2 from volume 1 keep
+delete volume 1
+create cylinder rad {r1} height {h2}
+move volume 4 z {-h2/2}
+subtract volume 4 from volume 2 keep
+delete volume 2
+create cylinder rad {r1} height {h1}
+move volume 6 z {h1/2}
+create cylinder rad {r2} height {h2}
+move volume 7 z {-h2/2}
+subtract volume 6 from all
+subtract volume 7 from all
+imprint volume all
+merge volume all
+
+# inlet
+sideset 100 surface 14
+# outlet
+sideset 200 surface 16
+# top/bottom
+sideset 300 surface 13 15
+# left/right
+sideset 400 surface 11 12 23 31 33
+# wall
+sideset 500 surface 32 34 36
+
+# Mesh constraints
+#  circular sections
+curve 15 16 29 30 39 40 41 interval {ncirc}
+curve 15 16 29 30 39 40 41 scheme equal
+#  x intervals
+curve 18 20 22 24 interval {nx}
+curve 18 20 22 24 scheme equal
+#  y intervals
+curve 17 19 21 23 interval {ny}
+curve 17 19 21 23 scheme equal
+#  z intervals 
+curve 25 26 27 28 interval {nz}
+curve 25 26 27 28 scheme equal
+surface 10 20 interval {nz}
+
+surface 23 31 scheme hole rad_intervals {nr} bias -0.5
+surface 33 34 scheme hole rad_intervals {nr} bias -0.5
+
+mesh volume all
+block 10 volume all
+block 10 element type HEX27
