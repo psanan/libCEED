@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
 
   //I keep for now both, different things initialized
   ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD,dim,PETSC_FALSE,melem,NULL,NULL,NULL,PETSC_TRUE,&dm);CHKERRQ(ierr);
+  //ierr = DMPlexCreateFromFile(PETSC_COMM_WORLD, "3dhole1z.exo", PETSC_TRUE, &dm);CHKERRQ(ierr);
   ierr = PetscFECreateDefault(PETSC_COMM_SELF,dim,1,PETSC_FALSE,NULL,PETSC_DETERMINE,&fe);CHKERRQ(ierr);
   ierr = DMSetFromOptions(dm);CHKERRQ(ierr);
   ierr = DMAddField(dm,NULL,(PetscObject)fe);CHKERRQ(ierr);
@@ -277,6 +278,16 @@ int main(int argc, char **argv) {
     }
     ierr = DMPlexRestoreClosureIndices(dmcoord,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
   }
+/*
+ PetscViewer     vtkviewersoln;
+
+                ierr = PetscViewerCreate(comm, &vtkviewersoln);CHKERRQ(ierr);
+                ierr = PetscViewerSetType(vtkviewersoln,PETSCVIEWERVTK);CHKERRQ(ierr);
+                ierr = PetscViewerFileSetName(vtkviewersoln, "solution.vtk");CHKERRQ(ierr);
+                ierr = VecView(solVecGlobal, vtkviewersoln);CHKERRQ(ierr);
+                ierr = PetscViewerDestroy(&vtkviewersoln);CHKERRQ(ierr);
+
+*/
   CeedElemRestrictionCreateVector(Erestrictx, &xcoord, NULL);
   CeedVectorSetArray(xcoord, CEED_MEM_HOST, CEED_COPY_VALUES, (PetscScalar*)coordArray);
   ierr = VecRestoreArrayRead(coords,&coordArray);CHKERRQ(ierr);
