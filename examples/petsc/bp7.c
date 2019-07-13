@@ -164,7 +164,13 @@ int main(int argc, char **argv) {
   KSP ksp;
   User user;
   double my_rt_start, my_rt, rt_min, rt_max;
-  
+  PetscInt		cStart, cEnd, nelem, marker_ids[] = {1};
+  const PetscScalar     *coordArray;
+  Vec			coords;
+  PetscSpace            sp;
+  PetscFE               fe;
+  PetscSection          section;
+
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
   if (ierr) return ierr;
@@ -179,10 +185,9 @@ int main(int argc, char **argv) {
                           "Benchmarking mode (prints benchmark statistics)",
                           NULL, benchmark_mode, &benchmark_mode, NULL);
   CHKERRQ(ierr);
-  degree = 1;// test_mode ? 3 : 1;
+  degree = 2;// test_mode ? 3 : 1;
   ierr = PetscOptionsInt("-petscspace_degree", "Polynomial degree of tensor product basis",
-                         NULL, degree, &degree, NULL); CHKERRQ(ierr);
-  //gotta change this eventually
+                        NULL, degree, &degree, NULL); CHKERRQ(ierr);
   qextra = 0;
   ierr = PetscOptionsInt("-qextra", "Number of extra quadrature points",
                          NULL, qextra, &qextra, NULL); CHKERRQ(ierr);
@@ -197,19 +202,7 @@ int main(int argc, char **argv) {
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
   CeedInit(ceedresource, &ceed);
 
-  //needed for the geometry, eventually this should be just one function call
-  PetscInt		vStart, vEnd, j, numindices, *indices, marker_ids[] = {1};
-  PetscInt		ic, cStart, cEnd, nelem;
-  const PetscScalar     *coordArray;
-  Vec			coords;
-  PetscSpace            sp;
-  PetscFE               fe;
-  PetscSection          section;
-
-
-  //I keep for now both, different things initialized
-  ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD,dim,PETSC_FALSE,melem,NULL,NULL,NULL,PETSC_TRUE,&dm);CHKERRQ(ierr);
-  //ierr = DMPlexCreateFromFile(PETSC_COMM_WORLD, "3dhole1z.exo", PETSC_TRUE, &dm);CHKERRQ(ierr);
+  ierr = DMPlexCreateFromFile(PETSC_COMM_WORLD, "3dhole1z.exo", PETSC_TRUE, &dm);CHKERRQ(ierr);
   ierr = PetscFECreateDefault(PETSC_COMM_SELF,dim,1,PETSC_FALSE,NULL,PETSC_DETERMINE,&fe);CHKERRQ(ierr);
   ierr = DMSetFromOptions(dm);CHKERRQ(ierr);
   ierr = DMAddField(dm,NULL,(PetscObject)fe);CHKERRQ(ierr);
@@ -226,68 +219,29 @@ int main(int argc, char **argv) {
 
   P = degree + 1;
   Q = P + qextra;
+
   CeedBasisCreateTensorH1Lagrange(ceed, 3, 1, P, Q, CEED_GAUSS, &basisu);
   CeedBasisCreateTensorH1Lagrange(ceed, 3, 3, 2, Q, CEED_GAUSS, &basisx);
 
-  //CeedInt ndof2,nqpt2;
-  //ierr = CeedBasisGetNumNodes(basisu, &ndof2); //CeedChk(ierr);
-  //ierr = CeedBasisGetNumQuadraturePoints(basisu, &nqpt2); //CeedChk(ierr);
-  //printf("basis ndof %d, nqpt %d\n", ndof2, nqpt2);
   ierr = DMGetCoordinateDM(dm, &dmcoord);CHKERRQ(ierr);
   ierr = DMPlexSetClosurePermutationTensor(dmcoord,PETSC_DETERMINE,NULL);CHKERRQ(ierr);
+
   CreateRestrictionPlex(ceed, 2, 3, &Erestrictx, dmcoord);
   CreateRestrictionPlex(ceed, P, 1, &Erestrictu, dm);
 
   ierr = DMPlexGetHeightStratum(dm,0,&cStart,&cEnd);CHKERRQ(ierr);
   nelem = cEnd - cStart;
+
   CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
                                     &Erestrictui);
   CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
                                     &Erestrictxi);
 
-  /*
-   CeedInt  xdof, udof;
-  CeedElemRestrictionGetNumComponents(Erestrictx,&xdof);
-  CeedElemRestrictionGetNumComponents(Erestrictui,&udof);
-  printf("restriction dofs, xdof %d, udof %d, nelem %d \n",xdof,udof, nelem);
-   */
 
-  ierr = DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);CHKERRQ(ierr);
-  ierr = DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);CHKERRQ(ierr);
-
-        /*	Get Local Coordinates	*/
   ierr = DMGetCoordinatesLocal(dm, &coords);CHKERRQ(ierr);
   ierr = VecGetArrayRead(coords,&coordArray);CHKERRQ(ierr);
-  ierr = DMGetDefaultSection(dmcoord, &section);CHKERRQ(ierr);
+  ierr = DMGetDefaultSection(dmcoord, &section);CHKERRQ(ierr); 
 
-  ierr = PetscPrintf(comm, " Total number vertices %d, cells %d \n", vEnd-vStart, cEnd-cStart);CHKERRQ(ierr);
-  for (ic = cStart; ic < cEnd; ic++) {
-    ierr = DMPlexGetClosureIndices(dmcoord,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
-    printf("coords %d\n",numindices);
-    // writing this super explicitly, in case there are still issues
-    for (j = 0; j < numindices; j+=dim) {
-      PetscScalar xx,yy,zz;
-      PetscInt    tx,ty,tz;
-      tx = indices[j];
-      ty = indices[j+1];
-      tz = indices[j+2];
-      xx = coordArray[tx];
-      yy = coordArray[ty];
-      zz = coordArray[tz];
-      ierr = PetscPrintf(comm, "E %d.%d: xloc(%2d, %2d, %2d)=(%.2f,%.2f,%0.2f)\n", ic, j, tx, ty, tz, xx,yy,zz);CHKERRQ(ierr);
-    }
-    ierr = DMPlexRestoreClosureIndices(dmcoord,section,section,ic,&numindices,&indices,NULL);CHKERRQ(ierr);
-  }
-/*
- PetscViewer     vtkviewersoln;
-
-                ierr = PetscViewerCreate(comm, &vtkviewersoln);CHKERRQ(ierr);
-                ierr = PetscViewerSetType(vtkviewersoln,PETSCVIEWERVTK);CHKERRQ(ierr);
-                ierr = PetscViewerFileSetName(vtkviewersoln, "solution.vtk");CHKERRQ(ierr);
-                ierr = VecView(solVecGlobal, vtkviewersoln);CHKERRQ(ierr);
-                ierr = PetscViewerDestroy(&vtkviewersoln);CHKERRQ(ierr);
-
-*/
   CeedElemRestrictionCreateVector(Erestrictx, &xcoord, NULL);
   CeedVectorSetArray(xcoord, CEED_MEM_HOST, CEED_COPY_VALUES, (PetscScalar*)coordArray);
   ierr = VecRestoreArrayRead(coords,&coordArray);CHKERRQ(ierr);
@@ -388,14 +342,8 @@ int main(int argc, char **argv) {
   ierr = VecDuplicate(Xloc, &rhsloc); CHKERRQ(ierr);
   ierr = VecZeroEntries(rhsloc); CHKERRQ(ierr);
   ierr = VecGetArray(rhsloc, &r); CHKERRQ(ierr);
+
   CeedVectorSetArray(rhsceed, CEED_MEM_HOST, CEED_USE_POINTER, r);
-
-  PetscInt ntest,ntestt;
-  CeedScalar *testo;
-
-  CeedVectorGetLength(xcoord,&ntest);
-  CeedVectorGetLength(rho, &ntestt);
-  printf("Length of rho is %d, length of xcoord %d, gsize %d, Xlocsize %d \n",ntestt, ntest,gsize,Xlocsize);
   CeedOperatorApply(op_setup, xcoord, rho, CEED_REQUEST_IMMEDIATE);
   ierr = CeedVectorSyncArray(rhsceed, CEED_MEM_HOST); CHKERRQ(ierr);
   CeedVectorDestroy(&xcoord);
@@ -450,7 +398,6 @@ int main(int argc, char **argv) {
       CHKERRQ(ierr);
     }
   }
-/*
   {
     PetscReal maxerror;
     ierr = ComputeErrorMax(user, op_error, X, target, &maxerror); CHKERRQ(ierr);
@@ -459,7 +406,17 @@ int main(int argc, char **argv) {
       CHKERRQ(ierr);
     }
   }
-*/
+
+
+  
+ PetscViewer     vtkviewersoln;
+
+ ierr = PetscViewerCreate(comm, &vtkviewersoln);CHKERRQ(ierr);
+ ierr = PetscViewerSetType(vtkviewersoln,PETSCVIEWERVTK);CHKERRQ(ierr);
+ ierr = PetscViewerFileSetName(vtkviewersoln, "solution.vtk");CHKERRQ(ierr);
+ ierr = VecView(X, vtkviewersoln);CHKERRQ(ierr);
+ ierr = PetscViewerDestroy(&vtkviewersoln);CHKERRQ(ierr);
+
   ierr = VecDestroy(&rhs); CHKERRQ(ierr);
   ierr = VecDestroy(&rhsloc); CHKERRQ(ierr);
   ierr = VecDestroy(&X); CHKERRQ(ierr);
