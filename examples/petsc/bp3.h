@@ -66,6 +66,13 @@ static int Setup(void *ctx, CeedInt Q,
   return 0;
 }
 
+static PetscErrorCode TrueSolution(PetscInt dim, PetscReal time,
+                                   const PetscReal x[], PetscInt Nc,
+                                   PetscScalar *u, void *ctx) {
+  u[0] = PetscSqrtReal(PetscSqr(x[0]) + PetscSqr(x[1]) + PetscSqr(x[2]));
+  return 0;
+}
+
 static int Diff(void *ctx, CeedInt Q,
                 const CeedScalar *const *in, CeedScalar *const *out) {
   const CeedScalar *ug = in[0], *qd = in[1];
