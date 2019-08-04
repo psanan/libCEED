@@ -23,6 +23,7 @@
 #include "operator.hpp"
 #include "composite-operator.hpp"
 
+#include "elem-restriction.hpp"
 #include "qfunction.hpp"
 #include "types.hpp"
 #include "vector.hpp"
