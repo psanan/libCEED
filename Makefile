@@ -178,7 +178,7 @@ cuda-shared.cu := $(sort $(wildcard backends/cuda-shared/*.cu))
 cuda-gen.c     := $(sort $(wildcard backends/cuda-gen/*.c))
 cuda-gen.cpp   := $(sort $(wildcard backends/cuda-gen/*.cpp))
 cuda-gen.cu    := $(sort $(wildcard backends/cuda-gen/*.cu))
-occa.c         := $(sort $(wildcard backends/occa/*.c))
+occa.cpp       := $(sort $(wildcard backends/occa/*.cpp))
 magma_preprocessor := python backends/magma/gccm.py
 magma_pre_src  := $(filter-out %ceed-magma.c %_tmp.c, $(wildcard backends/magma/ceed-*.c))
 magma_dsrc     := $(wildcard backends/magma/magma_d*.c)
@@ -244,7 +244,7 @@ info:
 	$(info MEMCHK_STATUS = $(MEMCHK_STATUS)$(call backend_status,/cpu/self/memcheck/serial /cpu/sef/memcheck/blocked))
 	$(info AVX_STATUS    = $(AVX_STATUS)$(call backend_status,/cpu/self/avx/serial /cpu/self/avx/blocked))
 	$(info XSMM_DIR      = $(XSMM_DIR)$(call backend_status,/cpu/self/xsmm/serial /cpu/self/xsmm/blocked))
-	$(info OCCA_DIR      = $(OCCA_DIR)$(call backend_status,/cpu/occa /gpu/occa /omp/occa))
+	$(info OCCA_DIR      = $(OCCA_DIR)$(call backend_status,$(OCCA_BACKENDS)))
 	$(info MAGMA_DIR     = $(MAGMA_DIR)$(call backend_status,/gpu/magma))
 	$(info CUDA_DIR      = $(CUDA_DIR)$(call backend_status,$(CUDA_BACKENDS)))
 	$(info ------------------------------------)
@@ -313,12 +313,14 @@ ifneq ($(wildcard $(XSMM_DIR)/lib/libxsmm.*),)
 endif
 
 # OCCA Backends
+OCCA_BACKENDS = /cpu/occa /gpu/occa /*/occa
 ifneq ($(wildcard $(OCCA_DIR)/lib/libocca.*),)
+  $(libceeds) : CPPFLAGS += -I$(OCCA_DIR)/include
   $(libceeds) : LDFLAGS += -L$(OCCA_DIR)/lib -Wl,-rpath,$(abspath $(OCCA_DIR)/lib)
   $(libceeds) : LDLIBS += -locca
-  libceed.c += $(occa.c)
-  $(occa.c:%.c=$(OBJDIR)/%.o) $(occa.c:%=%.tidy) : CPPFLAGS += -I$(OCCA_DIR)/include
-  BACKENDS += /cpu/occa /gpu/occa /omp/occa
+  $(libceeds) : LINK = $(CXX)
+  libceed.cpp += $(occa.cpp)
+  BACKENDS += $(OCCA_BACKENDS)
 endif
 
 # CUDA Backends
