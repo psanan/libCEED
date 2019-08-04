@@ -28,8 +28,8 @@ namespace ceed {
     int TensorBasis::apply(const CeedInt elements,
                            CeedTransposeMode tmode,
                            CeedEvalMode emode,
-                           Vector &u,
-                           Vector &v) {
+                           Vector *u,
+                           Vector *v) {
       return 0;
     }
   }

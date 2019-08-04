@@ -45,14 +45,15 @@ namespace ceed {
       virtual ~Basis();
 
       static Basis* from(CeedBasis basis);
+      static Basis* from(CeedOperatorField operatorField);
 
       ::occa::device getDevice();
 
       virtual int apply(const CeedInt elements,
                         CeedTransposeMode tmode,
                         CeedEvalMode emode,
-                        Vector &u,
-                        Vector &v) = 0;
+                        Vector *u,
+                        Vector *v) = 0;
 
       //---[ Ceed Callbacks ]-----------
       static int registerBasisFunction(Ceed ceed, CeedBasis basis,

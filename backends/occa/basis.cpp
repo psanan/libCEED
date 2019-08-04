@@ -55,6 +55,13 @@ namespace ceed {
       return basis_;
     }
 
+    Basis* Basis::from(CeedOperatorField operatorField) {
+      int ierr;
+      CeedBasis basis;
+      ierr = CeedOperatorFieldGetBasis(operatorField, &basis); CeedOccaFromChk(ierr);
+      return from(basis);
+    }
+
     ::occa::device Basis::getDevice() {
       return Context::from(ceed).device;
     }
@@ -69,20 +76,20 @@ namespace ceed {
                          CeedTransposeMode tmode,
                          CeedEvalMode emode, CeedVector u, CeedVector v) {
       Basis *basis_ = Basis::from(basis);
-      Vector *uVector = Vector::from(u);
-      Vector *vVector = Vector::from(v);
+      Vector *uVector = u ? Vector::from(u) : NULL;
+      Vector *vVector = v ? Vector::from(v) : NULL;
 
       if (!basis_) {
         return CeedError(NULL, 1, "Incorrect CeedBasis argument: op");
       }
-      if (!uVector) {
+      if (u && !uVector) {
         return CeedError(basis_->ceed, 1, "Incorrect CeedVector argument: u");
       }
-      if (!vVector) {
+      if (v && !vVector) {
         return CeedError(basis_->ceed, 1, "Incorrect CeedVector argument: v");
       }
 
-      return basis_->apply(nelem, tmode, emode, *uVector, *vVector);
+      return basis_->apply(nelem, tmode, emode, uVector, vVector);
     }
 
     int Basis::ceedDestroy(CeedBasis basis) {

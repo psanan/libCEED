@@ -14,6 +14,7 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+#include "basis.hpp"
 #include "operator.hpp"
 
 
@@ -150,10 +151,7 @@ namespace ceed {
         }
 
         // Get basis
-#if 0
-        // TODO: Add Basis
         Basis *basis = NULL;
-        CeedInt componentCount = 0;
         switch (emode) {
           case CEED_EVAL_GRAD:
           case CEED_EVAL_WEIGHT:
@@ -162,8 +160,8 @@ namespace ceed {
               return CeedError(ceed, 1, "Incorrect CeedBasis from opfield[%i]", (int) i);
             }
             break;
+          default: {}
         }
-#endif
 
         // Resize qVector
         switch (emode) {
@@ -173,23 +171,23 @@ namespace ceed {
             qVector.resize(ceedElements * ceedQ * componentCount);
             break;
           case CEED_EVAL_GRAD:
-            // qVector.resize(ceedElements * ceedQ * componentCount * basis->ceedDim);
+            qVector.resize(ceedElements * ceedQ * componentCount * basis->ceedDim);
             break;
           default:
             return CeedError(ceed, 1, "QFunctionField EvalMode is not implemented yet");
         }
 
         // Apply weight
-#if 0
         if (emode == CEED_EVAL_WEIGHT) {
           // TODO: Add Basis
           ierr = basis->apply(
             ceedElements,
             CEED_NOTRANSPOSE, CEED_EVAL_WEIGHT,
-            NULL, qVector
+            NULL, &qVector
           ); CeedChk(ierr);
         }
 
+#if 0
         if (emode != CEED_EVAL_WEIGHT) {
           // TODO: Add ElemRestriction
           ElemRestriction *eRestrict = ElemRestriction::from(operatorField);

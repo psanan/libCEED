@@ -31,8 +31,8 @@ namespace ceed {
       int apply(const CeedInt elements,
                 CeedTransposeMode tmode,
                 CeedEvalMode emode,
-                Vector &u,
-                Vector &v);
+                Vector *u,
+                Vector *v);
     };
   }
 }
