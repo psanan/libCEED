@@ -55,6 +55,11 @@ namespace ceed {
           currentHostBuffer(NULL),
           syncState(NONE_SYNC) {}
 
+      ~Vector() {
+        memory.free();
+        freeHostBuffer();
+      }
+
       static Vector* from(CeedVector vec) {
         int ierr;
         Vector *vector;
@@ -66,11 +71,6 @@ namespace ceed {
 #undef CeedVectorChk
 
         return vector;
-      }
-
-      void initialize(::occa::device device, const CeedInt length) {
-        resizeMemory(device, length);
-        currentMemory = memory;
       }
 
       ::occa::device getDevice() {
@@ -214,11 +214,6 @@ namespace ceed {
         return 0;
       }
 
-      int destroy() {
-        memory.free();
-        return 0;
-      }
-
       //---[ Ceed Callbacks ]-----------
       static int ceedSetArray(CeedVector vec, CeedMemType mtype,
                               CeedCopyMode cmode, CeedScalar *array) {
@@ -264,11 +259,8 @@ namespace ceed {
       }
 
       static int ceedDestroy(CeedVector vec) {
-        Vector *vector = Vector::from(vec);
-        if (vector) {
-          return vector->destroy();
-        }
-        return 1;
+        delete Vector::from(vec);
+        return 0;
       }
 
       //---[ Registration ]-------------
@@ -282,10 +274,6 @@ namespace ceed {
 
         Ceed ceed;
         ierr = CeedVectorGetCeed(vec, &ceed); CeedChk(ierr);
-        Context *context;
-        ierr = CeedGetData(ceed, (void**) &context); CeedChk(ierr);
-        CeedInt length;
-        CeedVectorGetLength(vec, &length);
 
         ierr = registerVectorFunction(ceed, vec, "SetArray",
                                       (ceed::occa::ceedFunction) Vector::ceedSetArray);
@@ -311,11 +299,7 @@ namespace ceed {
                                       (ceed::occa::ceedFunction) Vector::ceedDestroy);
         CeedChk(ierr);
 
-        Vector *vector;
-        ierr = CeedCalloc(1, &vector); CeedChk(ierr);
-
-        vector->initialize(context->device, length);
-
+        Vector *vector = new Vector();
         ierr = CeedVectorSetData(vec, (void**) &vector); CeedChk(ierr);
 
         return 0;
