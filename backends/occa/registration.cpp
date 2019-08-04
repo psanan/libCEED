@@ -20,6 +20,9 @@
 #include "simplex-basis.hpp"
 #include "tensor-basis.hpp"
 
+#include "operator.hpp"
+#include "composite-operator.hpp"
+
 #include "qfunction.hpp"
 #include "types.hpp"
 #include "vector.hpp"
@@ -37,12 +40,10 @@ namespace ceed {
         if (::occa::modeIsEnabled("HIP")) {
           return "HIP";
         }
-        if (::occa::modeIsEnabled("Metal")) {
-          return "Metal";
-        }
         if (::occa::modeIsEnabled("OpenCL")) {
           return "OpenCL";
         }
+        // Metal doesn't support doubles
       }
 
       if (cpuMode) {
@@ -120,45 +121,52 @@ namespace ceed {
     static int registerMethods(Ceed ceed) {
       int ierr;
 
-      ierr = registerCeedFunction(ceed, "GetPreferredMemType",
-                                  (ceed::occa::ceedFunction) ceed::occa::getPreferredMemType);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "GetPreferredMemType",
+        (ceed::occa::ceedFunction) ceed::occa::getPreferredMemType
+      ); CeedChk(ierr);
 
-      ierr = registerCeedFunction(ceed, "VectorCreate",
-                                  (ceed::occa::ceedFunction) ceed::occa::Vector::ceedCreate);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "VectorCreate",
+        (ceed::occa::ceedFunction) ceed::occa::Vector::ceedCreate
+      ); CeedChk(ierr);
 
-      ierr = registerCeedFunction(ceed, "BasisCreateTensorH1",
-                                  (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<TensorBasis>);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "BasisCreateTensorH1",
+        (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<TensorBasis>
+      ); CeedChk(ierr);
 
-      ierr = registerCeedFunction(ceed, "BasisCreateH1",
-                                  (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<SimplexBasis>);
-      CeedChk(ierr);
-
-#if 0
-      ierr = registerCeedFunction(ceed, "ElemRestrictionCreate",
-                                  (ceed::occa::ceedFunction) CeedElemRestrictionCreate_Cuda);
-      CeedChk(ierr);
-
-      ierr = registerCeedFunction(ceed, "ElemRestrictionCreateBlocked",
-                                  (ceed::occa::ceedFunction) CeedElemRestrictionCreateBlocked_Cuda);
-      CeedChk(ierr);
-#endif
-
-      ierr = registerCeedFunction(ceed, "QFunctionCreate",
-                                  (ceed::occa::ceedFunction) ceed::occa::QFunction::ceedCreate);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "BasisCreateH1",
+        (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<SimplexBasis>
+      ); CeedChk(ierr);
 
 #if 0
-      ierr = registerCeedFunction(ceed, "OperatorCreate",
-                                  (ceed::occa::ceedFunction) CeedOperatorCreate_Cuda);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "ElemRestrictionCreate",
+        (ceed::occa::ceedFunction) ceed::occa::ElemRestriction::ceedCreate
+      ); CeedChk(ierr);
 
-      ierr = registerCeedFunction(ceed, "CompositeOperatorCreate",
-                                  (ceed::occa::ceedFunction) CeedCompositeOperatorCreate_Cuda);
-      CeedChk(ierr);
+      ierr = registerCeedFunction(
+        ceed, "ElemRestrictionCreateBlocked",
+        (ceed::occa::ceedFunction) ceed::occa::ElemRestriction::ceedCreate
+      ); CeedChk(ierr);
 #endif
+
+      ierr = registerCeedFunction(
+        ceed, "QFunctionCreate",
+        (ceed::occa::ceedFunction) ceed::occa::QFunction::ceedCreate
+      ); CeedChk(ierr);
+
+      ierr = registerCeedFunction(
+        ceed, "OperatorCreate",
+        (ceed::occa::ceedFunction) ceed::occa::Operator::ceedCreate
+      ); CeedChk(ierr);
+
+      ierr = registerCeedFunction(
+        ceed, "CompositeOperatorCreate",
+        (ceed::occa::ceedFunction) ceed::occa::CompositeOperator::ceedCreate
+      ); CeedChk(ierr);
 
       return 0;
     }

@@ -19,11 +19,9 @@
 
 namespace ceed {
   namespace occa {
-    TensorBasis::TensorBasis() {
-    }
+    TensorBasis::TensorBasis() {}
 
-    TensorBasis::~TensorBasis() {
-    }
+    TensorBasis::~TensorBasis() {}
 
     int TensorBasis::apply(const CeedInt elements,
                            CeedTransposeMode tmode,

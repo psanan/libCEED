@@ -14,21 +14,44 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include "simplex-basis.hpp"
+#ifndef CEED_OCCA_COMPOSITEOPERATOR_HEADER
+#define CEED_OCCA_COMPOSITEOPERATOR_HEADER
+
+#include <vector>
+
+#include "operator.hpp"
 
 
 namespace ceed {
   namespace occa {
-    SimplexBasis::SimplexBasis() {}
+    typedef std::vector<ceed::occa::Operator*> OperatorVector_t;
 
-    SimplexBasis::~SimplexBasis() {}
+    class CompositeOperator {
+     public:
+      // Ceed object information
+      Ceed ceed;
+      OperatorVector_t ceedOperators;
 
-    int SimplexBasis::apply(const CeedInt elements,
-                            CeedTransposeMode tmode,
-                            CeedEvalMode emode,
-                            Vector *u,
-                            Vector *v) {
-      return 0;
-    }
+      CompositeOperator();
+
+      ~CompositeOperator();
+
+      static CompositeOperator* from(CeedOperator op);
+
+      int apply(Vector &in, Vector &out, CeedRequest *request);
+
+      //---[ Ceed Callbacks ]-----------
+      static int registerOperatorFunction(Ceed ceed, CeedOperator op,
+                                          const char *fname, ceed::occa::ceedFunction f);
+
+      static int ceedCreate(CeedOperator op);
+
+      static int ceedApply(CeedOperator op,
+                           CeedVector invec, CeedVector outvec, CeedRequest *request);
+
+      static int ceedDestroy(CeedOperator op);
+    };
   }
 }
+
+#endif

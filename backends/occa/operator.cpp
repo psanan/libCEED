@@ -15,6 +15,7 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "basis.hpp"
+#include "elem-restriction.hpp"
 #include "operator.hpp"
 
 
@@ -179,7 +180,6 @@ namespace ceed {
 
         // Apply weight
         if (emode == CEED_EVAL_WEIGHT) {
-          // TODO: Add Basis
           ierr = basis->apply(
             ceedElements,
             CEED_NOTRANSPOSE, CEED_EVAL_WEIGHT,
@@ -189,12 +189,11 @@ namespace ceed {
 
 #if 0
         if (emode != CEED_EVAL_WEIGHT) {
-          // TODO: Add ElemRestriction
-          ElemRestriction *eRestrict = ElemRestriction::from(operatorField);
-          if (!eRestrict) {
+          ElemRestriction *restrict = ElemRestriction::from(operatorField);
+          if (!restrict) {
             return CeedError(ceed, 1, "Incorrect ElemRestriction from opfield[%i]", (int) i);
           }
-          ierr = eRestrict->setupVector(NULL, eVector); CeedChk(ierr);
+          ierr = restrict->setupVector(NULL, eVector); CeedChk(ierr);
         }
 #endif
       }
@@ -205,6 +204,7 @@ namespace ceed {
       if (!isInitialized) {
         setup();
       }
+      // TODO: Implement
       return 0;
     }
 
