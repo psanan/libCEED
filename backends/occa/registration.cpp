@@ -121,13 +121,17 @@ namespace ceed {
         setDefaultProps(deviceProps, defaultMode);
       }
 
-      ceed::occa::Context *context;
       int ierr;
-      ierr = CeedCalloc(1, &context); CeedChk(ierr);
+      ceed::occa::Context *context = new Context();
       ierr = CeedSetData(ceed, (void**) &context); CeedChk(ierr);
 
       context->device = ::occa::device(deviceProps);
 
+      return 0;
+    }
+
+    static int destroyCeed(Ceed ceed) {
+      delete Context::from(ceed);
       return 0;
     }
 
@@ -142,6 +146,11 @@ namespace ceed {
 
     static int registerMethods(Ceed ceed) {
       int ierr;
+
+      ierr = registerCeedFunction(
+        ceed, "Destroy",
+        (ceed::occa::ceedFunction) ceed::occa::destroyCeed
+      ); CeedChk(ierr);
 
       ierr = registerCeedFunction(
         ceed, "GetPreferredMemType",

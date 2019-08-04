@@ -18,10 +18,10 @@
 
 namespace ceed {
   namespace occa {
-    Context& Context::from(Ceed ceed) {
+    Context* Context::from(Ceed ceed) {
       Context *context;
       CeedGetData(ceed, (void**) &context);
-      return *context;
+      return context;
     }
   }
 }

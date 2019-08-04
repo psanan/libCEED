@@ -46,7 +46,7 @@ namespace ceed {
       if (memory.isInitialized()) {
         return memory.getDevice();
       }
-      return Context::from(ceed).device;
+      return Context::from(ceed)->device;
     }
 
     void Vector::resize(const CeedInt length_) {

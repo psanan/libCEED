@@ -31,7 +31,7 @@ namespace ceed {
      public:
       ::occa::device device;
 
-      static Context& from(Ceed ceed);
+      static Context* from(Ceed ceed);
     };
 
     typedef struct {

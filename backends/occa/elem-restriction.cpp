@@ -49,7 +49,7 @@ namespace ceed {
     }
 
     ::occa::device ElemRestriction::getDevice() {
-      return Context::from(ceed).device;
+      return Context::from(ceed)->device;
     }
 
     int ElemRestriction::apply(CeedTransposeMode tmode, CeedTransposeMode lmode,

@@ -56,7 +56,7 @@ namespace ceed {
       if (qFunctionKernel.isInitialized()) {
         return qFunctionKernel.getDevice();
       }
-      return Context::from(ceed).device;
+      return Context::from(ceed)->device;
     }
 
     int QFunction::buildKernel() {

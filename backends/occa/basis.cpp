@@ -63,7 +63,7 @@ namespace ceed {
     }
 
     ::occa::device Basis::getDevice() {
-      return Context::from(ceed).device;
+      return Context::from(ceed)->device;
     }
 
     //---[ Ceed Callbacks ]-----------
