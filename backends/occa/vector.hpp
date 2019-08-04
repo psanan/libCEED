@@ -161,7 +161,7 @@ namespace ceed {
             return 0;
           case CEED_MEM_DEVICE:
             memory.free();
-            memory = currentMemory = *((::occa::modeMemory_t*) array);
+            memory = currentMemory = (::occa::modeMemory_t*) array;
             return 0;
         }
         return 1;
@@ -175,14 +175,14 @@ namespace ceed {
             return 0;
           case CEED_MEM_DEVICE:
             memory.free();
-            currentMemory = *((::occa::modeMemory_t*) array);
+            currentMemory = (::occa::modeMemory_t*) array;
             return 0;
         }
         return 1;
       }
 
       int getArray(CeedMemType mtype,
-                   CeedScalar *&array) {
+                   const CeedScalar **array) {
         switch (mtype) {
           case CEED_MEM_HOST:
             setCurrentHostBufferIfNeeded();
@@ -191,11 +191,11 @@ namespace ceed {
               currentMemory.copyTo(currentHostBuffer);
               syncState = HOST_SYNC;
             }
-            array = currentHostBuffer;
+            *array = currentHostBuffer;
             return 0;
           case CEED_MEM_DEVICE:
             setCurrentMemoryIfNeeded();
-            if (data->memState==HOST_SYNC) {
+            if (syncState == HOST_SYNC) {
               setCurrentHostBufferIfNeeded();
               currentMemory.copyFrom(currentHostBuffer);
               syncState = DEVICE_SYNC;
@@ -204,11 +204,6 @@ namespace ceed {
             return 0;
         }
         return 1;
-      }
-
-      int getArrayRead(CeedMemType mtype,
-                       const CeedScalar *&array) {
-        return 0;
       }
 
       int restoreArray() {
@@ -226,7 +221,7 @@ namespace ceed {
 
       //---[ Ceed Callbacks ]-----------
       static int ceedSetArray(CeedVector vec, CeedMemType mtype,
-                                CeedCopyMode cmode, CeedScalar *array) {
+                              CeedCopyMode cmode, CeedScalar *array) {
         Vector *vector = Vector::from(vec);
         if (vector) {
           return vector->setArray(mtype, cmode, array);
@@ -235,19 +230,19 @@ namespace ceed {
       }
 
       static int ceedGetArray(CeedVector vec, CeedMemType mtype,
-                                CeedScalar **array) {
+                              CeedScalar **array) {
         Vector *vector = Vector::from(vec);
         if (vector) {
-          return vector->getArray(mtype, *array);
+          return vector->getArray(mtype, (const CeedScalar**) array);
         }
         return 1;
       }
 
       static int ceedGetArrayRead(CeedVector vec, CeedMemType mtype,
-                                    const CeedScalar **array) {
+                                  const CeedScalar **array) {
         Vector *vector = Vector::from(vec);
         if (vector) {
-          return vector->getArrayRead(mtype, *array);
+          return vector->getArray(mtype, array);
         }
         return 1;
       }
