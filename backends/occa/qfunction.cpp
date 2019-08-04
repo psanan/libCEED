@@ -152,7 +152,6 @@ namespace ceed {
 
     int QFunction::ceedApply(CeedQFunction qf, CeedInt Q,
                              CeedVector *U, CeedVector *V) {
-      // TODO: Pass a vector of args
       QFunction *qFunction = QFunction::from(qf);
       if (qFunction) {
         return qFunction->apply(Q, U, V);

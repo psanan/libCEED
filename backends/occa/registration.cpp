@@ -16,6 +16,10 @@
 
 #include <occa.hpp>
 
+#include "basis.hpp"
+#include "simplex-basis.hpp"
+#include "tensor-basis.hpp"
+
 #include "qfunction.hpp"
 #include "types.hpp"
 #include "vector.hpp"
@@ -124,15 +128,15 @@ namespace ceed {
                                   (ceed::occa::ceedFunction) ceed::occa::Vector::ceedCreate);
       CeedChk(ierr);
 
-#if 0
       ierr = registerCeedFunction(ceed, "BasisCreateTensorH1",
-                                  (ceed::occa::ceedFunction) CeedBasisCreateTensorH1_Cuda);
+                                  (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<TensorBasis>);
       CeedChk(ierr);
 
       ierr = registerCeedFunction(ceed, "BasisCreateH1",
-                                  (ceed::occa::ceedFunction) CeedBasisCreateH1_Cuda);
+                                  (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<SimplexBasis>);
       CeedChk(ierr);
 
+#if 0
       ierr = registerCeedFunction(ceed, "ElemRestrictionCreate",
                                   (ceed::occa::ceedFunction) CeedElemRestrictionCreate_Cuda);
       CeedChk(ierr);
