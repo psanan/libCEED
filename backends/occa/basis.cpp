@@ -22,9 +22,9 @@ namespace ceed {
   namespace occa {
     Basis::Basis() :
         ceedDim(0),
-        ceedQuadraturePoints(0),
-        ceedNodes(0),
-        ceedComponents(0) {}
+        ceedQuadraturePointCount(0),
+        ceedNodeCount(0),
+        ceedComponentCount(0) {}
 
     Basis::~Basis() {
       interpKernel.free();
@@ -42,13 +42,13 @@ namespace ceed {
       ierr = CeedBasisGetData(basis, (void**) &basis_); CeedOccaFromChk(ierr);
       ierr = CeedBasisGetCeed(basis, &basis_->ceed); CeedOccaFromChk(ierr);
       ierr = CeedBasisGetDimension(basis, &basis_->ceedDim); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetNumComponents(basis, &basis_->ceedComponents); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetNumNodes(basis, &basis_->ceedNodes); CeedOccaFromChk(ierr);
+      ierr = CeedBasisGetNumComponents(basis, &basis_->ceedComponentCount); CeedOccaFromChk(ierr);
+      ierr = CeedBasisGetNumNodes(basis, &basis_->ceedNodeCount); CeedOccaFromChk(ierr);
 
       if (dynamic_cast<TensorBasis*>(basis_)) {
-        ierr = CeedBasisGetNumQuadraturePoints1D(basis, &basis_->ceedQuadraturePoints);
+        ierr = CeedBasisGetNumQuadraturePoints1D(basis, &basis_->ceedQuadraturePointCount);
       } else {
-        ierr = CeedBasisGetNumQuadraturePoints(basis, &basis_->ceedQuadraturePoints);
+        ierr = CeedBasisGetNumQuadraturePoints(basis, &basis_->ceedQuadraturePointCount);
       }
       CeedOccaFromChk(ierr);
 

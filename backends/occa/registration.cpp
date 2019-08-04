@@ -141,7 +141,6 @@ namespace ceed {
         (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<SimplexBasis>
       ); CeedChk(ierr);
 
-#if 0
       ierr = registerCeedFunction(
         ceed, "ElemRestrictionCreate",
         (ceed::occa::ceedFunction) ceed::occa::ElemRestriction::ceedCreate
@@ -151,7 +150,6 @@ namespace ceed {
         ceed, "ElemRestrictionCreateBlocked",
         (ceed::occa::ceedFunction) ceed::occa::ElemRestriction::ceedCreate
       ); CeedChk(ierr);
-#endif
 
       ierr = registerCeedFunction(
         ceed, "QFunctionCreate",

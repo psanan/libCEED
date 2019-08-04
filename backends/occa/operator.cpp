@@ -23,9 +23,9 @@ namespace ceed {
   namespace occa {
     Operator::Operator() :
         ceedQ(0),
-        ceedElements(0),
-        ceedInputFields(0),
-        ceedOutputFields(0),
+        ceedElementCount(0),
+        ceedInputFieldCount(0),
+        ceedOutputFieldCount(0),
         ceedOperatorInputFields(NULL),
         ceedOperatorOutputFields(NULL),
         ceedQFunctionInputFields(NULL),
@@ -51,11 +51,11 @@ namespace ceed {
 
       // Get dimensions
       ierr = CeedOperatorGetNumQuadraturePoints(op, &operator_->ceedQ); CeedOccaFromChk(ierr);
-      ierr = CeedOperatorGetNumElements(op, &operator_->ceedElements); CeedOccaFromChk(ierr);
+      ierr = CeedOperatorGetNumElements(op, &operator_->ceedElementCount); CeedOccaFromChk(ierr);
       ierr = CeedQFunctionGetNumArgs(
         qf,
-        &operator_->ceedInputFields,
-        &operator_->ceedOutputFields
+        &operator_->ceedInputFieldCount,
+        &operator_->ceedOutputFieldCount
       ); CeedOccaFromChk(ierr);
 
       // Get Fields
@@ -83,7 +83,7 @@ namespace ceed {
     int Operator::setup() {
       int ierr;
 
-      const CeedInt fieldCount = ceedInputFields + ceedOutputFields;
+      const CeedInt fieldCount = ceedInputFieldCount + ceedOutputFieldCount;
       eVectors.resize(fieldCount);
       qVectors.resize(fieldCount);
       for (CeedInt i = 0; i < fieldCount; ++i) {
@@ -91,13 +91,13 @@ namespace ceed {
         qVectors[i] = new Vector();
       }
 
-      VectorVector_t eInputVectors(eVectors.begin(), eVectors.begin() + ceedInputFields);
-      VectorVector_t qInputVectors(qVectors.begin(), qVectors.begin() + ceedInputFields);
-      VectorVector_t eOutputVectors(eVectors.begin() + ceedInputFields, eVectors.end());
-      VectorVector_t qOutputVectors(qVectors.begin() + ceedInputFields, qVectors.end());
+      VectorVector_t eInputVectors(eVectors.begin(), eVectors.begin() + ceedInputFieldCount);
+      VectorVector_t qInputVectors(qVectors.begin(), qVectors.begin() + ceedInputFieldCount);
+      VectorVector_t eOutputVectors(eVectors.begin() + ceedInputFieldCount, eVectors.end());
+      VectorVector_t qOutputVectors(qVectors.begin() + ceedInputFieldCount, qVectors.end());
 
       ierr = setupVectors(
-        ceedInputFields,
+        ceedInputFieldCount,
         eInputVectors,
         qInputVectors,
         ceedOperatorInputFields,
@@ -105,7 +105,7 @@ namespace ceed {
       ); CeedChk(ierr);
 
       ierr = setupVectors(
-        ceedOutputFields,
+        ceedOutputFieldCount,
         eOutputVectors,
         qOutputVectors,
         ceedOperatorOutputFields,
@@ -169,10 +169,10 @@ namespace ceed {
           case CEED_EVAL_NONE:
           case CEED_EVAL_INTERP:
           case CEED_EVAL_WEIGHT:
-            qVector.resize(ceedElements * ceedQ * componentCount);
+            qVector.resize(ceedElementCount * ceedQ * componentCount);
             break;
           case CEED_EVAL_GRAD:
-            qVector.resize(ceedElements * ceedQ * componentCount * basis->ceedDim);
+            qVector.resize(ceedElementCount * ceedQ * componentCount * basis->ceedDim);
             break;
           default:
             return CeedError(ceed, 1, "QFunctionField EvalMode is not implemented yet");
@@ -181,7 +181,7 @@ namespace ceed {
         // Apply weight
         if (emode == CEED_EVAL_WEIGHT) {
           ierr = basis->apply(
-            ceedElements,
+            ceedElementCount,
             CEED_NOTRANSPOSE, CEED_EVAL_WEIGHT,
             NULL, &qVector
           ); CeedChk(ierr);

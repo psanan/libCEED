@@ -28,7 +28,7 @@ namespace ceed {
 
       ~SimplexBasis();
 
-      int apply(const CeedInt elements,
+      int apply(const CeedInt elementCount,
                 CeedTransposeMode tmode,
                 CeedEvalMode emode,
                 Vector *u,

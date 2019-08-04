@@ -30,7 +30,10 @@ namespace ceed {
      public:
       // Ceed object information
       Ceed ceed;
-      CeedInt ceedQ, ceedElements, ceedInputFields, ceedOutputFields;
+      CeedInt ceedQ;
+      CeedInt ceedElementCount;
+      CeedInt ceedInputFieldCount;
+      CeedInt ceedOutputFieldCount;
       CeedOperatorField *ceedOperatorInputFields;
       CeedOperatorField *ceedOperatorOutputFields;
       CeedQFunctionField *ceedQFunctionInputFields;

@@ -23,7 +23,7 @@ namespace ceed {
 
     SimplexBasis::~SimplexBasis() {}
 
-    int SimplexBasis::apply(const CeedInt elements,
+    int SimplexBasis::apply(const CeedInt elementCount,
                             CeedTransposeMode tmode,
                             CeedEvalMode emode,
                             Vector *u,

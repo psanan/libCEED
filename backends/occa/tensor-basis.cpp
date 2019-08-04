@@ -23,7 +23,7 @@ namespace ceed {
 
     TensorBasis::~TensorBasis() {}
 
-    int TensorBasis::apply(const CeedInt elements,
+    int TensorBasis::apply(const CeedInt elementCount,
                            CeedTransposeMode tmode,
                            CeedEvalMode emode,
                            Vector *u,

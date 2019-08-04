@@ -28,9 +28,9 @@ namespace ceed {
       // Ceed object information
       Ceed ceed;
       CeedInt ceedDim;
-      CeedInt ceedQuadraturePoints;
-      CeedInt ceedNodes;
-      CeedInt ceedComponents;
+      CeedInt ceedQuadraturePointCount;
+      CeedInt ceedNodeCount;
+      CeedInt ceedComponentCount;
 
       // Owned resources
       ::occa::kernel interpKernel;
@@ -49,7 +49,7 @@ namespace ceed {
 
       ::occa::device getDevice();
 
-      virtual int apply(const CeedInt elements,
+      virtual int apply(const CeedInt elementCount,
                         CeedTransposeMode tmode,
                         CeedEvalMode emode,
                         Vector *u,
