@@ -24,6 +24,13 @@ namespace ceed {
     struct Context {
       ::occa::device device;
     };
+
+    typedef enum {
+      HOST_SYNC,
+      DEVICE_SYNC,
+      BOTH_SYNC,
+      NONE_SYNC
+    } VectorSyncState;
   }
 }
 
