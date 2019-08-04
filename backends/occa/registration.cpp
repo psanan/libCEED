@@ -57,6 +57,27 @@ namespace ceed {
       return "";
     }
 
+    void setDefaultProps(::occa::properties &deviceProps,
+                         const std::string &defaultMode) {
+      deviceProps["mode"] = defaultMode;
+
+      // Set default device id
+      if ((defaultMode == "CUDA")
+          || (defaultMode == "HIP")
+          || (defaultMode == "OpenCL")) {
+        if (!deviceProps.has("device_id")) {
+          deviceProps["device_id"] = 0;
+        }
+      }
+
+      // Set default platform id
+      if (defaultMode == "OpenCL") {
+        if (!deviceProps.has("platform_id")) {
+          deviceProps["platform_id"] = 0;
+        }
+      }
+    }
+
     static int initCeed(const char *c_resource, Ceed ceed) {
       const std::string resource(c_resource);
       bool cpuMode = resource.find("/cpu/occa") != std::string::npos;
@@ -97,7 +118,7 @@ namespace ceed {
                            "No available OCCA mode for the given resource: %s",
                            c_resource);
         }
-        deviceProps["mode"] = defaultMode;
+        setDefaultProps(deviceProps, defaultMode);
       }
 
       ceed::occa::Context *context;
