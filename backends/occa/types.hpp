@@ -20,6 +20,8 @@
 #include <ceed-backend.h>
 #include <occa.hpp>
 
+#define CeedOccaFromChk(ierr) \
+  do { if (ierr) return NULL; } while (0)
 
 namespace ceed {
   namespace occa {

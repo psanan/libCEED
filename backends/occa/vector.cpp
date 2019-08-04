@@ -20,6 +20,7 @@
 namespace ceed {
   namespace occa {
     Vector::Vector() :
+        length(0),
         hostBufferLength(0),
         hostBuffer(NULL),
         currentHostBuffer(NULL),
@@ -34,11 +35,9 @@ namespace ceed {
       int ierr;
       Vector *vector;
 
-#define CeedVectorChk(IERR) if (IERR) return NULL
-      ierr = CeedVectorGetData(vec, (void**) &vector); CeedVectorChk(ierr);
-      ierr = CeedVectorGetCeed(vec, &vector->ceed); CeedVectorChk(ierr);
-      ierr = CeedVectorGetLength(vec, &vector->ceedLength); CeedVectorChk(ierr);
-#undef CeedVectorChk
+      ierr = CeedVectorGetData(vec, (void**) &vector); CeedOccaFromChk(ierr);
+      ierr = CeedVectorGetCeed(vec, &vector->ceed); CeedOccaFromChk(ierr);
+      ierr = CeedVectorGetLength(vec, &vector->length); CeedOccaFromChk(ierr);
 
       return vector;
     }
@@ -50,34 +49,38 @@ namespace ceed {
       return Context::from(ceed).device;
     }
 
-    void Vector::resizeMemory(const CeedInt length) {
-      resizeMemory(getDevice(), length);
+    void Vector::resize(const CeedInt length_) {
+      length = length_;
     }
 
-    void Vector::resizeMemory(::occa::device device, const CeedInt length) {
-      if (length != (CeedInt) memory.length()) {
+    void Vector::resizeMemory(const CeedInt length_) {
+      resizeMemory(getDevice(), length_);
+    }
+
+    void Vector::resizeMemory(::occa::device device, const CeedInt length_) {
+      if (length_ != (CeedInt) memory.length()) {
         memory.free();
-        memory = device.malloc(ceedLength, ::occa::dtype::get<CeedScalar>());
+        memory = device.malloc(length_, ::occa::dtype::get<CeedScalar>());
       }
     }
 
-    void Vector::resizeHostBuffer(const CeedInt length) {
-      if (length != hostBufferLength) {
+    void Vector::resizeHostBuffer(const CeedInt length_) {
+      if (length_ != hostBufferLength) {
         delete hostBuffer;
-        hostBuffer = new CeedScalar[length];
+        hostBuffer = new CeedScalar[length_];
       }
     }
 
     void Vector::setCurrentMemoryIfNeeded() {
       if (!currentMemory.isInitialized()) {
-        resizeMemory(ceedLength);
+        resizeMemory(length);
         currentMemory = memory;
       }
     }
 
     void Vector::setCurrentHostBufferIfNeeded() {
       if (!currentHostBuffer) {
-        resizeHostBuffer(ceedLength);
+        resizeHostBuffer(length);
         currentHostBuffer = hostBuffer;
       }
     }
@@ -107,7 +110,7 @@ namespace ceed {
         case CEED_MEM_HOST:
           setCurrentHostBufferIfNeeded();
           if (array) {
-            memcpy(currentHostBuffer, array, ceedLength * sizeof(CeedScalar));
+            memcpy(currentHostBuffer, array, length * sizeof(CeedScalar));
           }
           return 0;
         case CEED_MEM_DEVICE:

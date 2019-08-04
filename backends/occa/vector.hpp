@@ -26,9 +26,9 @@ namespace ceed {
      public:
       // Ceed object information
       Ceed ceed;
-      CeedInt ceedLength;
 
       // Owned resources
+      CeedInt length;
       ::occa::memory memory;
       CeedInt hostBufferLength;
       CeedScalar *hostBuffer;
@@ -48,11 +48,13 @@ namespace ceed {
 
       ::occa::device getDevice();
 
-      void resizeMemory(const CeedInt length);
+      void resize(const CeedInt length_);
 
-      void resizeMemory(::occa::device device, const CeedInt length);
+      void resizeMemory(const CeedInt length_);
 
-      void resizeHostBuffer(const CeedInt length);
+      void resizeMemory(::occa::device device, const CeedInt length_);
+
+      void resizeHostBuffer(const CeedInt length_);
 
       void setCurrentMemoryIfNeeded();
 

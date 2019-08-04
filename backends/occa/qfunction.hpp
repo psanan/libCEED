@@ -58,7 +58,7 @@ namespace ceed {
       static int ceedCreate(CeedQFunction qf);
 
       static int ceedApply(CeedQFunction qf,
-                    CeedInt Q, CeedVector *U, CeedVector *V);
+                           CeedInt Q, CeedVector *U, CeedVector *V);
 
       static int ceedDestroy(CeedQFunction qf);
     };

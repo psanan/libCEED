@@ -36,20 +36,18 @@ namespace ceed {
       int ierr;
       QFunction *qFunction;
 
-#define CeedQFunctionChk(IERR) if (IERR) return NULL
-      ierr = CeedQFunctionGetData(qf, (void**) &qFunction); CeedQFunctionChk(ierr);
-      ierr = CeedQFunctionGetCeed(qf, &qFunction->ceed); CeedQFunctionChk(ierr);
+      ierr = CeedQFunctionGetData(qf, (void**) &qFunction); CeedOccaFromChk(ierr);
+      ierr = CeedQFunctionGetCeed(qf, &qFunction->ceed); CeedOccaFromChk(ierr);
       ierr = CeedQFunctionGetNumArgs(
         qf,
         &qFunction->ceedInputFields,
         &qFunction->ceedOutputFields
-      ); CeedQFunctionChk(ierr);
+      ); CeedOccaFromChk(ierr);
 
       ierr = CeedQFunctionGetContextSize(qf, &qFunction->ceedContextSize);
-      CeedQFunctionChk(ierr);
+      CeedOccaFromChk(ierr);
       ierr = CeedQFunctionGetInnerContext(qf, (void**) &qFunction->context);
-      CeedQFunctionChk(ierr);
-#undef CeedQFunctionChk
+      CeedOccaFromChk(ierr);
 
       return qFunction;
     }
@@ -65,6 +63,7 @@ namespace ceed {
       if (qFunctionKernel.isInitialized()) {
         return 0;
       }
+      // TODO: Build kernel
       return 0;
     }
 
@@ -91,7 +90,7 @@ namespace ceed {
       for (CeedInt i = 0; i < ceedInputFields; i++) {
         Vector *u = Vector::from(U[i]);
         if (!u) {
-          return CeedError(ceed, 1, "Incorrect qFunction input field: U[%i]", i);
+          return CeedError(ceed, 1, "Incorrect qFunction input field: U[%i]", (int) i);
         }
         ierr = u->getArray(CEED_MEM_DEVICE, &fields.inputs[i]); CeedChk(ierr);
       }
@@ -99,7 +98,7 @@ namespace ceed {
       for (CeedInt i = 0; i < ceedOutputFields; i++) {
         Vector *v = Vector::from(V[i]);
         if (!v) {
-          return CeedError(ceed, 1, "Incorrect qFunction output field: V[%i]", i);
+          return CeedError(ceed, 1, "Incorrect qFunction output field: V[%i]", (int) i);
         }
         ierr = v->getArray(CEED_MEM_DEVICE, &fields.outputs[i]); CeedChk(ierr);
       }
