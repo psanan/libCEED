@@ -47,13 +47,13 @@ namespace ceed {
       CeedScalar *currentHostBuffer;
 
       // State information
-      VectorSyncState memState;
+      VectorSyncState syncState;
 
       Vector() :
           hostBufferLength(0),
           hostBuffer(NULL),
           currentHostBuffer(NULL),
-          memState(NONE_SYNC) {}
+          syncState(NONE_SYNC) {}
 
       static Vector* from(CeedVector vec) {
         int ierr;
@@ -101,6 +101,20 @@ namespace ceed {
         }
       }
 
+      void setCurrentMemoryIfNeeded() {
+        if (!currentMemory.isInitialized()) {
+          resizeMemory(ceedLength);
+          currentMemory = memory;
+        }
+      }
+
+      void setCurrentHostBufferIfNeeded() {
+        if (!currentHostBuffer) {
+          resizeHostBuffer(ceedLength);
+          currentHostBuffer = hostBuffer;
+        }
+      }
+
       void freeHostBuffer() {
         if (hostBuffer) {
           delete [] hostBuffer;
@@ -124,27 +138,19 @@ namespace ceed {
       int copyArrayValues(CeedMemType mtype, CeedScalar *array) {
         switch (mtype) {
           case CEED_MEM_HOST:
-            if (!currentHostBuffer) {
-              resizeHostBuffer(ceedLength);
-              currentHostBuffer = hostBuffer;
-            }
+            setCurrentHostBufferIfNeeded();
             if (array) {
               memcpy(currentHostBuffer, array, ceedLength * sizeof(CeedScalar));
             }
-            break;
+            return 0;
           case CEED_MEM_DEVICE:
-            if (!currentMemory.isInitialized()) {
-              resizeMemory(ceedLength);
-              currentMemory = memory;
-            }
+            setCurrentMemoryIfNeeded();
             if (array) {
               currentMemory.copyFrom(array);
             }
-            break;
-          default:
-            return 1;
+            return 0;
         }
-        return 0;
+        return 1;
       }
 
       int ownArrayPointer(CeedMemType mtype, CeedScalar *array) {
@@ -152,15 +158,13 @@ namespace ceed {
           case CEED_MEM_HOST:
             freeHostBuffer();
             hostBuffer = currentHostBuffer = array;
-            break;
+            return 0;
           case CEED_MEM_DEVICE:
             memory.free();
-            memory = currentMemory = *((::occa::memory*) array);
-            break;
-          default:
-            return 1;
+            memory = currentMemory = *((::occa::modeMemory_t*) array);
+            return 0;
         }
-        return 0;
+        return 1;
       }
 
       int useArrayPointer(CeedMemType mtype, CeedScalar *array) {
@@ -168,20 +172,38 @@ namespace ceed {
           case CEED_MEM_HOST:
             freeHostBuffer();
             currentHostBuffer = array;
-            break;
+            return 0;
           case CEED_MEM_DEVICE:
             memory.free();
-            currentMemory = *((::occa::memory*) array);
-            break;
-          default:
-            return 1;
+            currentMemory = *((::occa::modeMemory_t*) array);
+            return 0;
         }
-        return 0;
+        return 1;
       }
 
       int getArray(CeedMemType mtype,
                    CeedScalar *&array) {
-        return 0;
+        switch (mtype) {
+          case CEED_MEM_HOST:
+            setCurrentHostBufferIfNeeded();
+            if (syncState == DEVICE_SYNC) {
+              setCurrentMemoryIfNeeded();
+              currentMemory.copyTo(currentHostBuffer);
+              syncState = HOST_SYNC;
+            }
+            array = currentHostBuffer;
+            return 0;
+          case CEED_MEM_DEVICE:
+            setCurrentMemoryIfNeeded();
+            if (data->memState==HOST_SYNC) {
+              setCurrentHostBufferIfNeeded();
+              currentMemory.copyFrom(currentHostBuffer);
+              syncState = DEVICE_SYNC;
+            }
+            *array = (CeedScalar*) currentMemory.getModeMemory();
+            return 0;
+        }
+        return 1;
       }
 
       int getArrayRead(CeedMemType mtype,
