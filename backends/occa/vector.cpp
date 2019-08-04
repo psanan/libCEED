@@ -47,10 +47,7 @@ namespace ceed {
       if (memory.isInitialized()) {
         return memory.getDevice();
       }
-
-      Context *context;
-      CeedGetData(ceed, (void**) &context);
-      return context->device;
+      return Context::from(ceed).device;
     }
 
     void Vector::resizeMemory(const CeedInt length) {
@@ -152,6 +149,11 @@ namespace ceed {
     }
 
     int Vector::getArray(CeedMemType mtype,
+                         CeedScalar **array) {
+      return getArray(mtype, (const CeedScalar**) array);
+    }
+
+    int Vector::getArray(CeedMemType mtype,
                          const CeedScalar **array) {
       switch (mtype) {
         case CEED_MEM_HOST:
@@ -176,70 +178,21 @@ namespace ceed {
       return 1;
     }
 
-    int Vector::restoreArray() {
-      return 0;
+    int Vector::restoreArray(CeedScalar **array) {
+      return restoreArray((const CeedScalar**) array);
     }
 
-    int Vector::restoreArrayRead() {
+    int Vector::restoreArray(const CeedScalar **array) {
       return 0;
     }
 
     //---[ Ceed Callbacks ]-----------
-    int Vector::ceedSetArray(CeedVector vec, CeedMemType mtype,
-                             CeedCopyMode cmode, CeedScalar *array) {
-      Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->setArray(mtype, cmode, array);
-      }
-      return 1;
-    }
-
-    int Vector::ceedGetArray(CeedVector vec, CeedMemType mtype,
-                             CeedScalar **array) {
-      Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->getArray(mtype, (const CeedScalar**) array);
-      }
-      return 1;
-    }
-
-    int Vector::ceedGetArrayRead(CeedVector vec, CeedMemType mtype,
-                                 const CeedScalar **array) {
-      Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->getArray(mtype, array);
-      }
-      return 1;
-    }
-
-    int Vector::ceedRestoreArray(CeedVector vec) {
-      Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->restoreArray();
-      }
-      return 1;
-    }
-
-    int Vector::ceedRestoreArrayRead(CeedVector vec) {
-      Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->restoreArrayRead();
-      }
-      return 1;
-    }
-
-    int Vector::ceedDestroy(CeedVector vec) {
-      delete Vector::from(vec);
-      return 0;
-    }
-
-    //---[ Registration ]-------------
     int Vector::registerVectorFunction(Ceed ceed, CeedVector vec,
                                        const char *fname, ceed::occa::ceedFunction f) {
       return CeedSetBackendFunction(ceed, "Vector", vec, fname, f);
     }
 
-    int Vector::createVector(CeedInt n, CeedVector vec) {
+    int Vector::ceedCreate(CeedInt length, CeedVector vec) {
       int ierr;
 
       Ceed ceed;
@@ -272,6 +225,54 @@ namespace ceed {
       Vector *vector = new Vector();
       ierr = CeedVectorSetData(vec, (void**) &vector); CeedChk(ierr);
 
+      return 0;
+    }
+
+    int Vector::ceedSetArray(CeedVector vec, CeedMemType mtype,
+                             CeedCopyMode cmode, CeedScalar *array) {
+      Vector *vector = Vector::from(vec);
+      if (vector) {
+        return vector->setArray(mtype, cmode, array);
+      }
+      return 1;
+    }
+
+    int Vector::ceedGetArray(CeedVector vec, CeedMemType mtype,
+                             CeedScalar **array) {
+      Vector *vector = Vector::from(vec);
+      if (vector) {
+        return vector->getArray(mtype, array);
+      }
+      return 1;
+    }
+
+    int Vector::ceedGetArrayRead(CeedVector vec, CeedMemType mtype,
+                                 const CeedScalar **array) {
+      Vector *vector = Vector::from(vec);
+      if (vector) {
+        return vector->getArray(mtype, array);
+      }
+      return 1;
+    }
+
+    int Vector::ceedRestoreArray(CeedVector vec, CeedScalar **array) {
+      Vector *vector = Vector::from(vec);
+      if (vector) {
+        return vector->restoreArray(array);
+      }
+      return 1;
+    }
+
+    int Vector::ceedRestoreArrayRead(CeedVector vec, CeedScalar **array) {
+      Vector *vector = Vector::from(vec);
+      if (vector) {
+        return vector->restoreArray(array);
+      }
+      return 1;
+    }
+
+    int Vector::ceedDestroy(CeedVector vec) {
+      delete Vector::from(vec);
       return 0;
     }
   }

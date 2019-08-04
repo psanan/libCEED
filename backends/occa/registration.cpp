@@ -14,9 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include <ceed-backend.h>
 #include <occa.hpp>
 
+#include "qfunction.hpp"
 #include "types.hpp"
 #include "vector.hpp"
 
@@ -121,7 +121,7 @@ namespace ceed {
       CeedChk(ierr);
 
       ierr = registerCeedFunction(ceed, "VectorCreate",
-                                  (ceed::occa::ceedFunction) ceed::occa::Vector::createVector);
+                                  (ceed::occa::ceedFunction) ceed::occa::Vector::ceedCreate);
       CeedChk(ierr);
 
 #if 0
@@ -140,11 +140,13 @@ namespace ceed {
       ierr = registerCeedFunction(ceed, "ElemRestrictionCreateBlocked",
                                   (ceed::occa::ceedFunction) CeedElemRestrictionCreateBlocked_Cuda);
       CeedChk(ierr);
+#endif
 
       ierr = registerCeedFunction(ceed, "QFunctionCreate",
-                                  (ceed::occa::ceedFunction) CeedQFunctionCreate_Cuda);
+                                  (ceed::occa::ceedFunction) ceed::occa::QFunction::ceedCreate);
       CeedChk(ierr);
 
+#if 0
       ierr = registerCeedFunction(ceed, "OperatorCreate",
                                   (ceed::occa::ceedFunction) CeedOperatorCreate_Cuda);
       CeedChk(ierr);

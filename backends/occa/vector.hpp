@@ -17,9 +17,6 @@
 #ifndef CEED_OCCA_VECTOR_HEADER
 #define CEED_OCCA_VECTOR_HEADER
 
-#include <ceed-backend.h>
-#include <occa.hpp>
-
 #include "types.hpp"
 
 
@@ -31,7 +28,7 @@ namespace ceed {
       Ceed ceed;
       CeedInt ceedLength;
 
-      // Owned resource
+      // Owned resources
       ::occa::memory memory;
       CeedInt hostBufferLength;
       CeedScalar *hostBuffer;
@@ -73,13 +70,21 @@ namespace ceed {
       int useArrayPointer(CeedMemType mtype, CeedScalar *array);
 
       int getArray(CeedMemType mtype,
+                   CeedScalar **array);
+
+      int getArray(CeedMemType mtype,
                    const CeedScalar **array);
 
-      int restoreArray();
+      int restoreArray(CeedScalar **array);
 
-      int restoreArrayRead();
+      int restoreArray(const CeedScalar **array);
 
       //---[ Ceed Callbacks ]-----------
+      static int registerVectorFunction(Ceed ceed, CeedVector vec,
+                                        const char *fname, ceed::occa::ceedFunction f);
+
+      static int ceedCreate(CeedInt length, CeedVector vec);
+
       static int ceedSetArray(CeedVector vec, CeedMemType mtype,
                               CeedCopyMode cmode, CeedScalar *array);
 
@@ -89,17 +94,11 @@ namespace ceed {
       static int ceedGetArrayRead(CeedVector vec, CeedMemType mtype,
                                   const CeedScalar **array);
 
-      static int ceedRestoreArray(CeedVector vec);
+      static int ceedRestoreArray(CeedVector vec, CeedScalar **array);
 
-      static int ceedRestoreArrayRead(CeedVector vec);
+      static int ceedRestoreArrayRead(CeedVector vec, CeedScalar **array);
 
       static int ceedDestroy(CeedVector vec);
-
-      //---[ Registration ]-------------
-      static int registerVectorFunction(Ceed ceed, CeedVector vec,
-                                        const char *fname, ceed::occa::ceedFunction f);
-
-      static int createVector(CeedInt n, CeedVector vec);
     };
   }
 }

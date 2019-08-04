@@ -1,0 +1,23 @@
+#define CEED_QFUNCTION inline __device__
+
+typedef struct {
+  const CeedScalar* inputs[16];
+  CeedScalar* outputs[16];
+} Fields_Cuda;
+
+<qfunction>
+
+extern "C" __global__ void qfunction(void *ctx, CeedInt Q, Fields_Cuda fields) {
+  const CeedScalar* in[NUM_INPUT_FIELDS];
+  const CeedScalar* out[NUM_OUTPUT_FIELDS];
+
+  in[0] = fields.inputs[0];
+  ...
+  in[N] = fields.inputs[N];
+
+  out[0] = fields.outputs[0];
+  ...
+  out[M] = fields.outputs[M];
+
+  KERNEL_NAME(ctx, Q, in, out);
+}

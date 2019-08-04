@@ -14,36 +14,14 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#ifndef CEED_OCCA_TYPES_HEADER
-#define CEED_OCCA_TYPES_HEADER
-
-#include <ceed-backend.h>
-#include <occa.hpp>
-
+#include "types.hpp"
 
 namespace ceed {
   namespace occa {
-    typedef int (*ceedFunction)();
-
-    class Context {
-     public:
-      ::occa::device device;
-
-      static Context& from(Ceed ceed);
-    };
-
-    typedef struct {
-      const CeedScalar *inputs[16];
-      CeedScalar *outputs[16];
-    } QFunctionFields;
-
-    typedef enum {
-      HOST_SYNC,
-      DEVICE_SYNC,
-      BOTH_SYNC,
-      NONE_SYNC
-    } VectorSyncState;
+    Context& Context::from(Ceed ceed) {
+      Context *context;
+      CeedGetData(ceed, (void**) &context);
+      return *context;
+    }
   }
 }
-
-#endif
