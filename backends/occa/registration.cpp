@@ -124,6 +124,36 @@ namespace ceed {
                                   (ceed::occa::ceedFunction) ceed::occa::Vector::createVector);
       CeedChk(ierr);
 
+#if 0
+      ierr = registerCeedFunction(ceed, "BasisCreateTensorH1",
+                                  (ceed::occa::ceedFunction) CeedBasisCreateTensorH1_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "BasisCreateH1",
+                                  (ceed::occa::ceedFunction) CeedBasisCreateH1_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "ElemRestrictionCreate",
+                                  (ceed::occa::ceedFunction) CeedElemRestrictionCreate_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "ElemRestrictionCreateBlocked",
+                                  (ceed::occa::ceedFunction) CeedElemRestrictionCreateBlocked_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "QFunctionCreate",
+                                  (ceed::occa::ceedFunction) CeedQFunctionCreate_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "OperatorCreate",
+                                  (ceed::occa::ceedFunction) CeedOperatorCreate_Cuda);
+      CeedChk(ierr);
+
+      ierr = registerCeedFunction(ceed, "CompositeOperatorCreate",
+                                  (ceed::occa::ceedFunction) CeedCompositeOperatorCreate_Cuda);
+      CeedChk(ierr);
+#endif
+
       return 0;
     }
 
