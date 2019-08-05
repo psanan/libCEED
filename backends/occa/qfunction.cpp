@@ -127,6 +127,7 @@ namespace ceed {
     }
 
     int QFunction::ceedCreate(CeedQFunction qf) {
+      // Based on cuda-gen
       int ierr;
 
       Ceed ceed;

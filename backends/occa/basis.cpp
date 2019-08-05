@@ -26,14 +26,7 @@ namespace ceed {
         ceedNodeCount(0),
         ceedComponentCount(0) {}
 
-    Basis::~Basis() {
-      interpKernel.free();
-      gradKernel.free();
-      weightKernel.free();
-      interp.free();
-      grad.free();
-      qWeight.free();
-    }
+    Basis::~Basis() {}
 
     Basis* Basis::from(CeedBasis basis) {
       int ierr;

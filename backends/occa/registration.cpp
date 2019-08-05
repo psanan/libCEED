@@ -16,15 +16,12 @@
 
 #include <occa.hpp>
 
-#include "basis.hpp"
+#include "composite-operator.hpp"
+#include "elem-restriction.hpp"
+#include "operator.hpp"
+#include "qfunction.hpp"
 #include "simplex-basis.hpp"
 #include "tensor-basis.hpp"
-
-#include "operator.hpp"
-#include "composite-operator.hpp"
-
-#include "elem-restriction.hpp"
-#include "qfunction.hpp"
 #include "types.hpp"
 #include "vector.hpp"
 
@@ -143,9 +140,21 @@ namespace ceed {
       return CeedSetBackendFunction(ceed, "Ceed", ceed, fname, f);
     }
 
-    static int getPreferredMemType(CeedMemType *type) {
+    static int preferHostMemType(CeedMemType *type) {
+      *type = CEED_MEM_HOST;
+      return 0;
+    }
+
+    static int preferDeviceMemType(CeedMemType *type) {
       *type = CEED_MEM_DEVICE;
       return 0;
+    }
+
+    static ceed::occa::ceedFunction getPreferredMemType(Ceed ceed) {
+      if (Context::from(ceed)->device.hasSeparateMemorySpace()) {
+        return (ceed::occa::ceedFunction) preferDeviceMemType;
+      }
+      return (ceed::occa::ceedFunction) preferHostMemType;
     }
 
     static int registerMethods(Ceed ceed) {
@@ -158,7 +167,7 @@ namespace ceed {
 
       ierr = registerCeedFunction(
         ceed, "GetPreferredMemType",
-        (ceed::occa::ceedFunction) ceed::occa::getPreferredMemType
+        getPreferredMemType(ceed)
       ); CeedChk(ierr);
 
       ierr = registerCeedFunction(
@@ -168,12 +177,12 @@ namespace ceed {
 
       ierr = registerCeedFunction(
         ceed, "BasisCreateTensorH1",
-        (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<TensorBasis>
+        (ceed::occa::ceedFunction) ceed::occa::TensorBasis::ceedCreate
       ); CeedChk(ierr);
 
       ierr = registerCeedFunction(
         ceed, "BasisCreateH1",
-        (ceed::occa::ceedFunction) ceed::occa::Basis::ceedCreate<SimplexBasis>
+        (ceed::occa::ceedFunction) ceed::occa::SimplexBasis::ceedCreate
       ); CeedChk(ierr);
 
       ierr = registerCeedFunction(

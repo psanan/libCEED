@@ -33,6 +33,15 @@ namespace ceed {
                 CeedEvalMode emode,
                 Vector *u,
                 Vector *v);
+
+      //---[ Ceed Callbacks ]-----------
+      static int ceedCreate(CeedElemTopology topo, CeedInt dim,
+                            CeedInt ndof, CeedInt nqpts,
+                            const CeedScalar *interp,
+                            const CeedScalar *grad,
+                            const CeedScalar *qref,
+                            const CeedScalar *qweight,
+                            CeedBasis basis);
     };
   }
 }

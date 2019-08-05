@@ -72,6 +72,7 @@ namespace ceed {
     }
 
     int ElemRestriction::ceedCreate(CeedElemRestriction r) {
+      // Based on cuda-reg
       int ierr;
 
       Ceed ceed;

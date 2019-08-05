@@ -215,6 +215,7 @@ namespace ceed {
     }
 
     int Operator::ceedCreate(CeedOperator op) {
+      // Based on cuda-gen
       int ierr;
 
       Ceed ceed;

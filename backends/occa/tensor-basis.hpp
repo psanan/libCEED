@@ -24,15 +24,36 @@ namespace ceed {
   namespace occa {
     class TensorBasis : public Basis {
      public:
+      bool isInitialized;
+      ::occa::kernel interpKernel;
+      ::occa::kernel gradKernel;
+      ::occa::kernel weightKernel;
+      ::occa::memory interp1D;
+      ::occa::memory grad1D;
+      ::occa::memory qWeight1D;
+      CeedScalar *c_B;
+      CeedScalar *c_G;
+
       TensorBasis();
 
       ~TensorBasis();
+
+      int setup();
 
       int apply(const CeedInt elementCount,
                 CeedTransposeMode tmode,
                 CeedEvalMode emode,
                 Vector *u,
                 Vector *v);
+
+      //---[ Ceed Callbacks ]-----------
+      static int ceedCreate(CeedInt dim,
+                            CeedInt P1d, CeedInt Q1d,
+                            const CeedScalar *interp1d,
+                            const CeedScalar *grad1d,
+                            const CeedScalar *qref1d,
+                            const CeedScalar *qweight1d,
+                            CeedBasis basis);
     };
   }
 }

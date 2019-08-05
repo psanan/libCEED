@@ -32,14 +32,6 @@ namespace ceed {
       CeedInt ceedNodeCount;
       CeedInt ceedComponentCount;
 
-      // Owned resources
-      ::occa::kernel interpKernel;
-      ::occa::kernel gradKernel;
-      ::occa::kernel weightKernel;
-      ::occa::memory interp;
-      ::occa::memory grad;
-      ::occa::memory qWeight;
-
       Basis();
 
       virtual ~Basis();
@@ -58,27 +50,6 @@ namespace ceed {
       //---[ Ceed Callbacks ]-----------
       static int registerBasisFunction(Ceed ceed, CeedBasis basis,
                                        const char *fname, ceed::occa::ceedFunction f);
-
-      template <class BasisClass>
-      static int ceedCreate(CeedBasis basis) {
-        int ierr;
-
-        Ceed ceed;
-        ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
-
-        Basis *basis_ = new BasisClass();
-        ierr = CeedBasisSetData(basis, (void**) &basis_); CeedChk(ierr);
-
-        ierr = registerBasisFunction(ceed, basis, "Apply",
-                                     (ceed::occa::ceedFunction) Basis::ceedApply);
-        CeedChk(ierr);
-
-        ierr = registerBasisFunction(ceed, basis, "Destroy",
-                                     (ceed::occa::ceedFunction) Basis::ceedDestroy);
-        CeedChk(ierr);
-
-        return 0;
-      }
 
       static int ceedApply(CeedBasis basis, const CeedInt nelem,
                            CeedTransposeMode tmode,

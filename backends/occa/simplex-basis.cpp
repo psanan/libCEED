@@ -30,5 +30,33 @@ namespace ceed {
                             Vector *v) {
       return 0;
     }
+
+    //---[ Ceed Callbacks ]-------------
+    int SimplexBasis::ceedCreate(CeedElemTopology topo, CeedInt dim,
+                                 CeedInt ndof, CeedInt nqpts,
+                                 const CeedScalar *interp,
+                                 const CeedScalar *grad,
+                                 const CeedScalar *qref,
+                                 const CeedScalar *qweight,
+                                 CeedBasis basis) {
+      // Based on cuda-ref
+      int ierr;
+
+      Ceed ceed;
+      ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
+
+      SimplexBasis *basis_ = new SimplexBasis();
+      ierr = CeedBasisSetData(basis, (void**) &basis_); CeedChk(ierr);
+
+      ierr = registerBasisFunction(ceed, basis, "Apply",
+                                   (ceed::occa::ceedFunction) Basis::ceedApply);
+      CeedChk(ierr);
+
+      ierr = registerBasisFunction(ceed, basis, "Destroy",
+                                   (ceed::occa::ceedFunction) Basis::ceedDestroy);
+      CeedChk(ierr);
+
+      return 0;
+    }
   }
 }

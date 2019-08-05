@@ -19,15 +19,59 @@
 
 namespace ceed {
   namespace occa {
-    TensorBasis::TensorBasis() {}
+    TensorBasis::TensorBasis() :
+        isInitialized(false) {}
 
     TensorBasis::~TensorBasis() {}
+
+    int TensorBasis::setup() {
+      if (isInitialized) {
+        return 0;
+      }
+
+      isInitialized = true;
+      return 0;
+    }
 
     int TensorBasis::apply(const CeedInt elementCount,
                            CeedTransposeMode tmode,
                            CeedEvalMode emode,
                            Vector *u,
                            Vector *v) {
+      setup();
+
+      return 0;
+    }
+
+    //---[ Ceed Callbacks ]-------------
+    int TensorBasis::ceedCreate(CeedInt dim,
+                                CeedInt P1d, CeedInt Q1d,
+                                const CeedScalar *interp1d,
+                                const CeedScalar *grad1d,
+                                const CeedScalar *qref1d,
+                                const CeedScalar *qweight1d,
+                                CeedBasis basis) {
+      // Based on cuda-shared
+      if (Q1d < P1d) {
+        return CeedError(NULL, 1, "Backend does not implement underintegrated basis.");
+      }
+
+      int ierr;
+
+      Ceed ceed;
+      ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
+
+      TensorBasis *basis_ = new TensorBasis();
+      ierr = CeedBasisSetData(basis, (void**) &basis_); CeedChk(ierr);
+
+      ierr = registerBasisFunction(ceed, basis, "Apply",
+                                   (ceed::occa::ceedFunction) Basis::ceedApply);
+      CeedChk(ierr);
+
+      ierr = registerBasisFunction(ceed, basis, "Destroy",
+                                   (ceed::occa::ceedFunction) Basis::ceedDestroy);
+      CeedChk(ierr);
+
       return 0;
     }
   }

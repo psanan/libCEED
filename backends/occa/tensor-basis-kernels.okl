@@ -1,0 +1,601 @@
+// Based on cuda-shared kernels
+//
+// Expects the following types:
+// - CeedInt
+// - CeedScalar
+//
+// Expects the following definitions:
+// - Q1D                  : CeedInt
+// - P1D                  : CeedInt
+// - ELEMENTS_PER_BLOCK   : CeedInt
+// - BASIS_COMPONENT_COUNT: CeedInt
+
+#define SHARED_BUFFER_SIZE (Q1D * ELEMENTS_PER_BLOCK)
+
+typedef CeedScalar* sharedBufferArray @dim(Q1D, ELEMENTS_PER_BLOCK);
+typedef CeedScalar* batchedDofArray   @dim(P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef CeedScalar* batchedQuadArray  @dim(Q1D, elementCount, BASIS_COMPONENT_COUNT);
+typedef CeedScalar* dofToQuadMap      @dim(P1D, Q1D);
+
+inline void add(CeedScalar *r_V, const CeedScalar *r_U) {
+  for (int i = 0; i < Q1D; i++) {
+    r_V[i] += r_U[i];
+  }
+}
+
+//---[ 1D Methods ]---------------------
+inline void readDofs1D(const int element,
+                       const int localElement,
+                       const int component,
+                       const int p,
+                       const batchedDofArray U,
+                       sharedBufferArray sharedBuffer) {
+  // Zero out extra entries
+  sharedBuffer(p, localElement) = (
+    (p < P1D)
+    ? U(p, component, element)
+    : 0.0
+  );
+}
+
+inline void writeDofs1D(const int element,
+                        const int component,
+                        const int p,
+                        const CeedScalar Vp,
+                        batchedDofArray V) {
+  if (p < P1D) {
+    V(p, component, element) = Vp;
+  }
+}
+
+inline void readQuads1D(const int elementCount,
+                        const int element,
+                        const int localElement,
+                        const int component,
+                        const int q,
+                        batchedQuadArray U,
+                        sharedBufferArray sharedBuffer) {
+  sharedBuffer(q, localElement) = U(q, element, component);
+}
+
+inline void writeQuads1D(const int elementCount,
+                         const int element,
+                         const int component,
+                         const int q,
+                         batchedQuadArray V,
+                         const CeedScalar Vq) {
+  V(q, element, component) = Vq;
+}
+
+inline void contractX1D(const int q,
+                        const int localElement,
+                        sharedBufferArray sharedBuffer,
+                        const dofToQuadMap B,
+                        CeedScalar &V) {
+  V = 0.0;
+  for (int p = 0; p < P1D; ++p) {
+    V += B(p, q) * sharedBuffer(p, localElement);
+  }
+}
+
+inline void contractTransposeX1D(const int p,
+                                 const int localElement,
+                                 sharedBufferArray sharedBuffer,
+                                 const dofToQuadMap B,
+                                 CeedScalar &V) {
+  V = 0.0;
+  for (int q = 0; q < Q1D; ++q) {
+    V += B(p, q) * sharedBuffer(q, localElement);
+  }
+}
+
+@kernel void interp1D(const CeedInt elementCount,
+                      const int transpose,
+                      @restrict const CeedScalar *B,
+                      @restrict const CeedScalar *U,
+                      @restrict CeedScalar *V) {
+
+  for (int elementOffset = 0; elementOffset < elementCount; elementOffset += ELEMENTS_PER_BLOCK; @outer) {
+    @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+    for (int localElement = 0; localElement < ELEMENTS_PER_BLOCK; ++localElement; @inner) {
+      for (int q = 0; q < Q1D; ++q; @inner) {
+
+        const int element = elementOffset + localElement;
+        if (element < elementCount) {
+          for(int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+            if(!transpose) {
+              CeedScalar Vq;
+              readDofs1D(element, localElement, component, q, U, sharedBuffer);
+              contractX1D(q, localElement, sharedBuffer, B, Vq);
+              writeQuads1D(elementCount, element, component, q, V, Vq);
+            } else {
+              CeedScalar Vp;
+              readQuads1D(elementCount, element, localElement, component, q, U, sharedBuffer);
+              contractTransposeX1D(q, localElement, sharedBuffer, B, Vp);
+              writeDofs1D(element, component, q, Vp, V);
+            }
+          }
+        }
+
+      }
+    }
+  }
+}
+
+@kernel void grad1D(const CeedInt elementCount,
+                    const int transpose,
+                    @restrict const CeedScalar *G,
+                    @restrict const CeedScalar *U,
+                    @restrict CeedScalar *V) {
+
+  for (int elementOffset = 0; elementOffset < elementCount; elementOffset += ELEMENTS_PER_BLOCK; @outer) {
+    @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+    for (int localElement = 0; localElement < ELEMENTS_PER_BLOCK; ++localElement; @inner) {
+      for (int q = 0; q < Q1D; ++q; @inner) {
+
+        const int element = elementOffset + localElement;
+        if (element < elementCount) {
+          for(int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+            if(!transpose) {
+              CeedScalar Vq;
+              readDofs1D(element, localElement, component, q, U, sharedBuffer);
+              contractX1D(q, localElement, sharedBuffer, G, Vq);
+              writeQuads1D(elementCount, element, component, q, V, Vq);
+            } else {
+              CeedScalar Vp;
+              readQuads1D(elementCount, element, localElement, component, q, U, sharedBuffer);
+              contractTransposeX1D(q, localElement, sharedBuffer, G, Vp);
+              writeDofs1D(element, component, q, Vp, V);
+            }
+          }
+        }
+
+      }
+    }
+  }
+}
+
+#if 0
+//---[ 2D Methods ]---------------------
+inline void readDofs2d(const int elem, const int tidx,
+                       const int tidy, const int comp,
+                       const int nelem, const CeedScalar *d_U, CeedScalar &U) {
+  U = (
+    (tidx<P1D && tidy<P1D)
+    ? d_U[tidx + tidy*P1D + comp*P1D*P1D + elem*BASIS_COMPONENT_COUNT*P1D*P1D ]
+    : 0.0
+  );
+}
+
+inline void writeDofs2d(const int elem, const int tidx,
+                        const int tidy, const int comp,
+                        const int nelem, const CeedScalar &r_V, CeedScalar *d_V) {
+  if (tidx<P1D && tidy<P1D) {
+    d_V[tidx + tidy*P1D + comp*P1D*P1D + elem*BASIS_COMPONENT_COUNT*P1D*P1D ] = r_V;
+  }
+}
+
+inline void readQuads2d(const int elem, const int tidx,
+                        const int tidy, const int comp,
+                        const int dim, const int nelem, const CeedScalar *d_U, CeedScalar &U ) {
+  U = d_U[tidx + tidy*Q1D + elem*Q1D*Q1D + comp*Q1D*Q1D*nelem +
+          dim*BASIS_COMPONENT_COUNT*nelem*Q1D*Q1D];
+}
+
+inline void writeQuads2d(const int elem, const int tidx,
+                         const int tidy, const int comp,
+                         const int dim, const int nelem, const CeedScalar &r_V, CeedScalar *d_V) {
+  d_V[tidx + tidy*Q1D + elem*Q1D*Q1D + comp*Q1D*Q1D*nelem +
+      dim*BASIS_COMPONENT_COUNT*nelem*Q1D*Q1D ] = r_V;
+}
+
+inline void contractX2d(sharedBufferArray sharedBuffer, const int tidx,
+                        const int tidy, const int tidz,
+                        const CeedScalar &U, const CeedScalar *B, CeedScalar &V) {
+  sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U;
+  @barrier()
+  V = 0.0;
+  for (int i = 0; i < P1D; ++i) {
+    // Contract in the x direction
+    V += B[i + tidx*P1D] * sharedBuffer[i + tidy*Q1D + tidz*Q1D*Q1D];
+  }
+  @barrier()
+}
+
+inline void contractY2d(sharedBufferArray sharedBuffer, const int tidx,
+                        const int tidy, const int tidz,
+                        const CeedScalar &U, const CeedScalar *B, CeedScalar &V) {
+  sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U;
+  @barrier()
+  V = 0.0;
+  for (int i = 0; i < P1D; ++i) {
+    // Contract in the y direction
+    V += B[i + tidy*P1D] * sharedBuffer[tidx + i*Q1D + tidz*Q1D*Q1D];
+  }
+  @barrier()
+}
+
+inline void contractTransposeY2d(sharedBufferArray sharedBuffer, const int tidx,
+                                 const int tidy, const int tidz,
+                                 const CeedScalar &U, const CeedScalar *B, CeedScalar &V) {
+  sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U;
+  @barrier()
+  V = 0.0;
+  if (tidy<P1D) {
+    for (int i = 0; i < Q1D; ++i) {
+      // Contract in the y direction
+      V += B[tidy + i*P1D] * sharedBuffer[tidx + i*Q1D + tidz*Q1D*Q1D];
+    }
+  }
+  @barrier()
+}
+
+inline void contractTransposeX2d(sharedBufferArray sharedBuffer, const int tidx,
+                                 const int tidy, const int tidz,
+                                 const CeedScalar &U, const CeedScalar *B, CeedScalar &V) {
+  sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U;
+  @barrier()
+  V = 0.0;
+  if (tidx<P1D) {
+    for (int i = 0; i < Q1D; ++i) {
+      // Contract in the x direction
+      V += B[tidx + i*P1D] * sharedBuffer[i + tidy*Q1D + tidz*Q1D*Q1D];
+    }
+  }
+  @barrier()
+}
+
+@kernel void interp2d(const CeedInt nelem,
+                      const int transpose,
+                      const CeedScalar *c_B,
+                      @restrict const CeedScalar *d_U,
+                      @restrict CeedScalar *d_V) {
+  @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+  CeedScalar r_V;
+  CeedScalar r_t;
+
+  const int tidx = threadIdx.x;
+  const int tidy = threadIdx.y;
+  const int tidz = threadIdx.z;
+  const int blockElem = tidz/BASIS_COMPONENT_COUNT;
+  const int elemsPerBlock = blockDim.z/BASIS_COMPONENT_COUNT;
+  const int comp = tidz%BASIS_COMPONENT_COUNT;
+
+  for (CeedInt elem = blockIdx.x*elemsPerBlock + blockElem; elem < nelem; elem += gridDim.x*elemsPerBlock) {
+    const int comp = tidz%BASIS_COMPONENT_COUNT;
+    r_V = 0.0;
+    r_t = 0.0;
+    if(!transpose) {
+      readDofs2d(elem, tidx, tidy, comp, nelem, d_U, r_V);
+      contractX2d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractY2d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      writeQuads2d(elem, tidx, tidy, comp, 0, nelem, r_V, d_V);
+    } else {
+      readQuads2d(elem, tidx, tidy, comp, 0, nelem, d_U, r_V);
+      contractTransposeY2d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractTransposeX2d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      writeDofs2d(elem, tidx, tidy, comp, nelem, r_V, d_V);
+    }
+  }
+}
+
+@kernel void grad2d(const CeedInt nelem,
+                    const int transpose,
+                    const CeedScalar *c_B,
+                    const CeedScalar *c_G,
+                    @restrict const CeedScalar *d_U,
+                    @restrict CeedScalar *d_V) {
+  @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+  CeedScalar r_U;
+  CeedScalar r_V;
+  CeedScalar r_t;
+
+  const int tidx = threadIdx.x;
+  const int tidy = threadIdx.y;
+  const int tidz = threadIdx.z;
+  const int blockElem = tidz/BASIS_COMPONENT_COUNT;
+  const int elemsPerBlock = blockDim.z/BASIS_COMPONENT_COUNT;
+  const int comp = tidz%BASIS_COMPONENT_COUNT;
+  int dim;
+
+  for (CeedInt elem = blockIdx.x*elemsPerBlock + blockElem; elem < nelem; elem += gridDim.x*elemsPerBlock) {
+    if(!transpose) {
+      readDofs2d(elem, tidx, tidy, comp, nelem, d_U, r_U);
+      contractX2d(sharedBuffer, tidx, tidy, tidz, r_U, c_G, r_t);
+      contractY2d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      dim = 0;
+      writeQuads2d(elem, tidx, tidy, comp, dim, nelem, r_V, d_V);
+      contractX2d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      contractY2d(sharedBuffer, tidx, tidy, tidz, r_t, c_G, r_V);
+      dim = 1;
+      writeQuads2d(elem, tidx, tidy, comp, dim, nelem, r_V, d_V);
+    } else {
+      dim = 0;
+      readQuads2d(elem, tidx, tidy, comp, dim, nelem, d_U, r_U);
+      contractTransposeY2d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      contractTransposeX2d(sharedBuffer, tidx, tidy, tidz, r_t, c_G, r_V);
+      dim = 1;
+      readQuads2d(elem, tidx, tidy, comp, dim, nelem, d_U, r_U);
+      contractTransposeY2d(sharedBuffer, tidx, tidy, tidz, r_U, c_G, r_t);
+      contractTransposeX2d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_U);
+      r_V+=r_U;
+      writeDofs2d(elem, tidx, tidy, comp, nelem, r_V, d_V);
+    }
+  }
+}
+
+//---[ 3D Methods ]---------------------
+inline void readDofs3d(const int elem, const int tidx,
+                       const int tidy, const int comp,
+                       const int nelem, const CeedScalar *d_U, CeedScalar *r_U) {
+  for (int i = 0; i < P1D; ++i) {
+    r_U[i] = (
+      (tidx<P1D && tidy<P1D)
+      ? d_U[tidx + tidy*P1D + i*P1D*P1D + comp*P1D*P1D*P1D + elem*BASIS_COMPONENT_COUNT*P1D*P1D*P1D ]
+      : 0.0
+    );
+  }
+  for (int i = P1D; i < Q1D; ++i) {
+    r_U[i] = 0.0;
+  }
+}
+
+inline void readQuads3d(const int elem, const int tidx,
+                        const int tidy, const int comp,
+                        const int dim, const int nelem, const CeedScalar *d_U, CeedScalar *r_U) {
+  for (int i = 0; i < Q1D; ++i) {
+    r_U[i] = d_U[tidx + tidy*Q1D + i*Q1D*Q1D + elem*Q1D*Q1D*Q1D +
+                 comp*Q1D*Q1D*Q1D*nelem + dim*BASIS_COMPONENT_COUNT*nelem*Q1D*Q1D*Q1D];
+  }
+}
+
+inline void writeDofs3d(const int elem, const int tidx,
+                        const int tidy, const int comp,
+                        const int nelem, const CeedScalar *r_V, CeedScalar *d_V) {
+  if (tidx<P1D && tidy<P1D) {
+    for (int i = 0; i < P1D; ++i) {
+      d_V[tidx + tidy*P1D + i*P1D*P1D + comp*P1D*P1D*P1D +
+          elem*BASIS_COMPONENT_COUNT*P1D*P1D*P1D ] = r_V[i];
+    }
+  }
+}
+
+inline void writeQuads3d(const int elem, const int tidx,
+                         const int tidy, const int comp,
+                         const int dim, const int nelem, const CeedScalar *r_V, CeedScalar *d_V) {
+  for (int i = 0; i < Q1D; ++i) {
+    d_V[tidx + tidy*Q1D + i*Q1D*Q1D + elem*Q1D*Q1D*Q1D + comp*Q1D*Q1D*Q1D*nelem +
+        dim*BASIS_COMPONENT_COUNT*nelem*Q1D*Q1D*Q1D ] = r_V[i];
+  }
+}
+
+inline void contractX3d(sharedBufferArray sharedBuffer, const int tidx,
+                        const int tidy, const int tidz,
+                        const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < P1D; ++k) {
+    sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U[k];
+    @barrier()
+    V[k] = 0.0;
+    for (int i = 0; i < P1D; ++i) {
+      // Contract in the x direction
+      V[k] += B[i + tidx*P1D] * sharedBuffer[i + tidy*Q1D + tidz*Q1D*Q1D];
+    }
+    @barrier()
+  }
+}
+
+inline void contractY3d(sharedBufferArray sharedBuffer, const int tidx,
+                        const int tidy, const int tidz,
+                        const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < P1D; ++k) {
+    sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U[k];
+    @barrier()
+    V[k] = 0.0;
+    for (int i = 0; i < P1D; ++i) {
+      // Contract in the y direction
+      V[k] += B[i + tidy*P1D] * sharedBuffer[tidx + i*Q1D + tidz*Q1D*Q1D];
+    }
+    @barrier()
+  }
+}
+
+inline void contractZ3d(sharedBufferArray sharedBuffer, const int tidx,
+                        const int tidy, const int tidz,
+                        const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < Q1D; ++k) {
+    V[k] = 0.0;
+    for (int i = 0; i < P1D; ++i) {
+      // Contract in the z direction
+      V[k] += B[i + k*P1D] * U[i];
+    }
+  }
+}
+
+inline void contractTransposeZ3d(sharedBufferArray sharedBuffer, const int tidx,
+                                 const int tidy, const int tidz,
+                                 const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < Q1D; ++k) {
+    V[k] = 0.0;
+    if (k<P1D) {
+      for (int i = 0; i < Q1D; ++i) {
+        // Contract in the z direction
+        V[k] += B[k + i*P1D] * U[i];
+      }
+    }
+  }
+}
+
+inline void contractTransposeY3d(sharedBufferArray sharedBuffer, const int tidx,
+                                 const int tidy, const int tidz,
+                                 const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < P1D; ++k) {
+    sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U[k];
+    @barrier()
+    V[k] = 0.0;
+    if (tidy<P1D) {
+      for (int i = 0; i < Q1D; ++i) {
+        // Contract in the y direction
+        V[k] += B[tidy + i*P1D] * sharedBuffer[tidx + i*Q1D + tidz*Q1D*Q1D];
+      }
+    }
+    @barrier()
+  }
+}
+
+inline void contractTransposeX3d(sharedBufferArray sharedBuffer, const int tidx,
+                                 const int tidy, const int tidz,
+                                 const CeedScalar *U, const CeedScalar *B, CeedScalar *V) {
+  for (int k = 0; k < P1D; ++k) {
+    sharedBuffer[tidx+tidy*Q1D+tidz*Q1D*Q1D] = U[k];
+    @barrier()
+    V[k] = 0.0;
+    if (tidx<P1D) {
+      for (int i = 0; i < Q1D; ++i) {
+        // Contract in the x direction
+        V[k] += B[tidx + i*P1D] * sharedBuffer[i + tidy*Q1D + tidz*Q1D*Q1D];
+      }
+    }
+    @barrier()
+  }
+}
+
+@kernel void interp3d(const CeedInt nelem,
+                      const int transpose,
+                      const CeedScalar *c_B,
+                      @restrict const CeedScalar *d_U,
+                      @restrict CeedScalar *d_V) {
+  @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+  CeedScalar r_V[Q1D];
+  CeedScalar r_t[Q1D];
+
+  const int tidx = threadIdx.x;
+  const int tidy = threadIdx.y;
+  const int tidz = threadIdx.z;
+  const int blockElem = tidz/BASIS_COMPONENT_COUNT;
+  const int elemsPerBlock = blockDim.z/BASIS_COMPONENT_COUNT;
+  const int comp = tidz%BASIS_COMPONENT_COUNT;
+
+  for (CeedInt elem = blockIdx.x*elemsPerBlock + blockElem; elem < nelem;
+       elem += gridDim.x*elemsPerBlock) {
+    for (int i = 0; i < Q1D; ++i) {
+      r_V[i] = 0.0;
+      r_t[i] = 0.0;
+    }
+    if(!transpose) {
+      readDofs3d(elem, tidx, tidy, comp, nelem, d_U, r_V);
+      contractX3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractY3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      contractZ3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      writeQuads3d(elem, tidx, tidy, comp, 0, nelem, r_t, d_V);
+    } else {
+      readQuads3d(elem, tidx, tidy, comp, 0, nelem, d_U, r_V);
+      contractTransposeZ3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractTransposeY3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      contractTransposeX3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      writeDofs3d(elem, tidx, tidy, comp, nelem, r_t, d_V);
+    }
+  }
+}
+
+@kernel void grad3d(const CeedInt nelem,
+                    const int transpose,
+                    const CeedScalar *c_B,
+                    const CeedScalar *c_G,
+                    @restrict const CeedScalar *d_U,
+                    @restrict CeedScalar *d_V) {
+  @shared CeedScalar sharedBuffer[SHARED_BUFFER_SIZE];
+
+  //use P1D for one of these
+  CeedScalar r_U[Q1D];
+  CeedScalar r_V[Q1D];
+  CeedScalar r_t[Q1D];
+
+  const int tidx = threadIdx.x;
+  const int tidy = threadIdx.y;
+  const int tidz = threadIdx.z;
+  const int blockElem = tidz/BASIS_COMPONENT_COUNT;
+  const int elemsPerBlock = blockDim.z/BASIS_COMPONENT_COUNT;
+  const int comp = tidz%BASIS_COMPONENT_COUNT;
+  int dim;
+
+  for (CeedInt elem = blockIdx.x*elemsPerBlock + blockElem; elem < nelem;
+       elem += gridDim.x*elemsPerBlock) {
+    if(!transpose) {
+      readDofs3d(elem, tidx, tidy, comp, nelem, d_U, r_U);
+      contractX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_G, r_V);
+      contractY3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractZ3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      dim = 0;
+      writeQuads3d(elem, tidx, tidy, comp, dim, nelem, r_V, d_V);
+      contractX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_V);
+      contractY3d(sharedBuffer, tidx, tidy, tidz, r_V, c_G, r_t);
+      contractZ3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_V);
+      dim = 1;
+      writeQuads3d(elem, tidx, tidy, comp, dim, nelem, r_V, d_V);
+      contractX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_V);
+      contractY3d(sharedBuffer, tidx, tidy, tidz, r_V, c_B, r_t);
+      contractZ3d(sharedBuffer, tidx, tidy, tidz, r_t, c_G, r_V);
+      dim = 2;
+      writeQuads3d(elem, tidx, tidy, comp, dim, nelem, r_V, d_V);
+    } else {
+      dim = 0;
+      readQuads3d(elem, tidx, tidy, comp, dim, nelem, d_U, r_U);
+      contractTransposeZ3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      contractTransposeY3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_U);
+      contractTransposeX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_G, r_V);
+      dim = 1;
+      readQuads3d(elem, tidx, tidy, comp, dim, nelem, d_U, r_U);
+      contractTransposeZ3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      contractTransposeY3d(sharedBuffer, tidx, tidy, tidz, r_t, c_G, r_U);
+      contractTransposeX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      add(r_V, r_t);
+      dim = 2;
+      readQuads3d(elem, tidx, tidy, comp, dim, nelem, d_U, r_U);
+      contractTransposeZ3d(sharedBuffer, tidx, tidy, tidz, r_U, c_G, r_t);
+      contractTransposeY3d(sharedBuffer, tidx, tidy, tidz, r_t, c_B, r_U);
+      contractTransposeX3d(sharedBuffer, tidx, tidy, tidz, r_U, c_B, r_t);
+      add(r_V, r_t);
+      writeDofs3d(elem, tidx, tidy, comp, nelem, r_V, d_V);
+    }
+  }
+}
+
+//---[ Weights ]------------------------
+@kernel weight1d(const CeedInt nelem, const CeedScalar *qweight1d,
+                 CeedScalar *w) {
+  const int tid = threadIdx.x;
+  const CeedScalar weight = qweight1d[tid];
+  for (CeedInt elem = blockIdx.x*blockDim.y + threadIdx.y; elem < nelem; elem += gridDim.x*blockDim.y) {
+    const int ind = elem*Q1D + tid;
+    w[ind] = weight;
+  }
+}
+
+@kernel weight2d(const CeedInt nelem, const CeedScalar *qweight1d,
+                 CeedScalar *w) {
+  const int i = threadIdx.x;
+  const int j = threadIdx.y;
+  const CeedScalar weight = qweight1d[i]*qweight1d[j];
+  for (CeedInt elem = blockIdx.x*blockDim.z + threadIdx.z; elem < nelem; elem += gridDim.x*blockDim.z) {
+    const int ind = elem*Q1D*Q1D + i + j*Q1D;
+    w[ind] = weight;
+  }
+}
+
+@kernel weight3d(const CeedInt nelem, const CeedScalar *qweight1d,
+                 CeedScalar *w) {
+  const int i = threadIdx.x;
+  const int j = threadIdx.y;
+  const int k = threadIdx.z;
+  const CeedScalar weight = qweight1d[i]*qweight1d[j]*qweight1d[k];
+  for (int e = blockIdx.x; e < nelem; e += gridDim.x) {
+    const int ind = e*Q1D*Q1D*Q1D + i + j*Q1D + k*Q1D*Q1D;
+    w[ind] = weight;
+  }
+}
+#endif
