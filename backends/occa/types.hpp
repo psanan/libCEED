@@ -20,8 +20,18 @@
 #include <ceed-backend.h>
 #include <occa.hpp>
 
-#define CeedOccaFromChk(ierr) \
-  do { if (ierr) return NULL; } while (0)
+#define CeedOccaFromChk(ierr)                   \
+  do {                                          \
+    if (ierr) {                                 \
+      return NULL;                              \
+    }                                           \
+  } while (0)
+
+#define CeedHandleOccaException(exc)            \
+  do {                                          \
+    std::string error = exc.toString();         \
+    return CeedError(ceed, 1, error.c_str());   \
+  } while (0)
 
 namespace ceed {
   namespace occa {

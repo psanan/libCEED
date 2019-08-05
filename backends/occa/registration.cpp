@@ -220,8 +220,7 @@ namespace ceed {
         ierr = ceed::occa::initCeed(resource, ceed); CeedChk(ierr);
         ierr = ceed::occa::registerMethods(ceed); CeedChk(ierr);
       } catch (::occa::exception exc) {
-        std::string error = exc.toString();
-        return CeedError(ceed, 1, error.c_str());
+        CeedHandleOccaException(exc);
       }
 
       return 0;

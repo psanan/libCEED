@@ -55,6 +55,8 @@ namespace ceed {
       }
 
       ::occa::properties kernelProps;
+      kernelProps["defines/CeedInt"]    = ::occa::dtype::get<CeedInt>().name();
+      kernelProps["defines/CeedScalar"] = ::occa::dtype::get<CeedScalar>().name();
       kernelProps["defines/Q1D"] = Q1D;
       kernelProps["defines/P1D"] = P1D;
       kernelProps["defines/BASIS_COMPONENT_COUNT"] = ceedComponentCount;
@@ -196,8 +198,10 @@ namespace ceed {
       const bool transpose = tmode == CEED_TRANSPOSE;
 
       if ((dim < 1) || (3 < dim)) {
-        return CeedError(NULL, 1,
-                         "Backend only supports dimensions 1, 2, and 3. Given: %i", dim);
+        return CeedError(
+          NULL, 1,
+          "Backend only supports dimensions 1, 2, and 3. Given: %i", dim
+        );
       }
 
       // Check arguments
@@ -220,15 +224,20 @@ namespace ceed {
           return CeedError(NULL, 1, "Backend does not support eval mode: %i", (int) emode);
       }
 
-      // Apply kernel
-      switch (emode) {
-        case CEED_EVAL_INTERP:
-          return applyInterp(elementCount, transpose, *U, *V);
-        case CEED_EVAL_GRAD:
-          return applyGrad(elementCount, transpose, *U, *V);
-        case CEED_EVAL_WEIGHT:
-          return applyWeight(elementCount, *V);
-        default: {}
+      try {
+        // Apply kernel
+        switch (emode) {
+          case CEED_EVAL_INTERP:
+            return applyInterp(elementCount, transpose, *U, *V);
+          case CEED_EVAL_GRAD:
+            return applyGrad(elementCount, transpose, *U, *V);
+          case CEED_EVAL_WEIGHT:
+            return applyWeight(elementCount, *V);
+          default: {}
+        }
+      } catch (::occa::exception exc) {
+        // Handle kernel build errors the CEED way
+        CeedHandleOccaException(exc);
       }
 
       return 0;
