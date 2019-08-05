@@ -204,18 +204,18 @@ inline void contractTransposeY(const int px,
               if (!transpose) {
                 readDofs(element, component, qx, qy, U, r1);
                 contractX(qx, qy, localElement, sharedBuffer, Bx, r1, r2);
-                contractY(qx, qy, localElement, sharedBuffer, B, r2, r3);
+                contractY(qx, qy, localElement, sharedBuffer, B , r2, r3);
                 writeQuads(elementCount, element, component, qx, qy, 0, r3, V);
-                contractX(qx, qy, localElement, sharedBuffer, B, r1, r2);
+                contractX(qx, qy, localElement, sharedBuffer, B , r1, r2);
                 contractY(qx, qy, localElement, sharedBuffer, Bx, r2, r3);
                 writeQuads(elementCount, element, component, qx, qy, 1, r3, V);
               } else {
                 readQuads(elementCount, element, component, qx, qy, 0, U, r1);
-                contractTransposeY(qx, qy, localElement, sharedBuffer, B, r1, r2);
+                contractTransposeY(qx, qy, localElement, sharedBuffer, B , r1, r2);
                 contractTransposeX(qx, qy, localElement, sharedBuffer, Bx, r2, r3);
                 readQuads(elementCount, element, component, qx, qy, 1, U, r1);
                 contractTransposeY(qx, qy, localElement, sharedBuffer, Bx, r1, r2);
-                contractTransposeX(qx, qy, localElement, sharedBuffer, B, r2, r1);
+                contractTransposeX(qx, qy, localElement, sharedBuffer, B , r2, r1);
                 writeDofs(element, component, qx, qy, r1 + r3, V);
               }
             }
