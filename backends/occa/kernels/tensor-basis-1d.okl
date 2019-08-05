@@ -58,8 +58,8 @@ inline void writeQuads(const int elementCount,
                        const int element,
                        const int component,
                        const int q,
-                       batchedQuadArray V,
-                       const CeedScalar Vq) {
+                       const CeedScalar Vq,
+                       batchedQuadArray V) {
   V(q, element, component) = Vq;
 }
 
@@ -100,14 +100,13 @@ inline void contractTransposeX(const int p,
 
         const int element = elementOffset + localElement;
         if (element < elementCount) {
-          for(int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
-            if(!transpose) {
-              CeedScalar Vq;
+          for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+            CeedScalar Vq;
+            if (!transpose) {
               readDofs(element, localElement, component, q, U, sharedBuffer);
               contractX(q, localElement, sharedBuffer, B, Vq);
-              writeQuads(elementCount, element, component, q, V, Vq);
+              writeQuads(elementCount, element, component, q, Vq, V);
             } else {
-              CeedScalar Vp;
               readQuads(elementCount, element, localElement, component, q, U, sharedBuffer);
               contractTransposeX(q, localElement, sharedBuffer, B, Vp);
               writeDofs(element, component, q, Vp, V);
@@ -134,12 +133,12 @@ inline void contractTransposeX(const int p,
 
         const int element = elementOffset + localElement;
         if (element < elementCount) {
-          for(int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
-            if(!transpose) {
+          for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+            if (!transpose) {
               CeedScalar Vq;
               readDofs(element, localElement, component, q, U, sharedBuffer);
               contractX(q, localElement, sharedBuffer, G, Vq);
-              writeQuads(elementCount, element, component, q, V, Vq);
+              writeQuads(elementCount, element, component, q, Vq, V);
             } else {
               CeedScalar Vp;
               readQuads(elementCount, element, localElement, component, q, U, sharedBuffer);
@@ -154,9 +153,9 @@ inline void contractTransposeX(const int p,
   }
 }
 
-@kernel weight(const CeedInt elementCount,
-               @retrict const CeedScalar *qWeights1D,
-               @retrict elementWeightArray W) {
+@kernel void weight(const CeedInt elementCount,
+                    @restrict const CeedScalar *qWeights1D,
+                    @restrict elementWeightArray W) {
   for (int elementOffset = 0; elementOffset < elementCount; elementOffset += ELEMENTS_PER_BLOCK; @outer) {
     for (int element = elementOffset; element < (elementOffset + ELEMENTS_PER_BLOCK); ++element; @outer) {
       for (int q = 0; q < Q1D; ++q; @inner) {
