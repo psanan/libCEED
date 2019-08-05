@@ -19,6 +19,14 @@
 
 namespace ceed {
   namespace occa {
+    static ::occa::memory arrayToMemory(CeedScalar *array) {
+      return ::occa::memory((::occa::modeMemory_t*) array);
+    }
+
+    static CeedScalar* memoryToArray(::occa::memory &memory) {
+      return (CeedScalar*) memory.getModeMemory();
+    }
+
     Vector::Vector() :
         length(0),
         hostBufferLength(0),
@@ -102,7 +110,7 @@ namespace ceed {
         case CEED_USE_POINTER:
           return useArrayPointer(mtype, array);
       }
-      return 1;
+      return CeedError(ceed, 1, "Invalid CeedCopyMode passed");
     }
 
     int Vector::copyArrayValues(CeedMemType mtype, CeedScalar *array) {
@@ -110,17 +118,19 @@ namespace ceed {
         case CEED_MEM_HOST:
           setCurrentHostBufferIfNeeded();
           if (array) {
-            memcpy(currentHostBuffer, array, length * sizeof(CeedScalar));
+            ::memcpy(currentHostBuffer, array, length * sizeof(CeedScalar));
           }
+          syncState = HOST_SYNC;
           return 0;
         case CEED_MEM_DEVICE:
           setCurrentMemoryIfNeeded();
           if (array) {
-            currentMemory.copyFrom(array);
+            currentMemory.copyFrom(arrayToMemory(array));
           }
+          syncState = DEVICE_SYNC;
           return 0;
       }
-      return 1;
+      return CeedError(ceed, 1, "Invalid CeedMemType passed");
     }
 
     int Vector::ownArrayPointer(CeedMemType mtype, CeedScalar *array) {
@@ -128,13 +138,15 @@ namespace ceed {
         case CEED_MEM_HOST:
           freeHostBuffer();
           hostBuffer = currentHostBuffer = array;
+          syncState = HOST_SYNC;
           return 0;
         case CEED_MEM_DEVICE:
           memory.free();
-          memory = currentMemory = (::occa::modeMemory_t*) array;
+          memory = currentMemory = arrayToMemory(array);
+          syncState = DEVICE_SYNC;
           return 0;
       }
-      return 1;
+      return CeedError(ceed, 1, "Invalid CeedMemType passed");
     }
 
     int Vector::useArrayPointer(CeedMemType mtype, CeedScalar *array) {
@@ -142,13 +154,15 @@ namespace ceed {
         case CEED_MEM_HOST:
           freeHostBuffer();
           currentHostBuffer = array;
+          syncState = HOST_SYNC;
           return 0;
         case CEED_MEM_DEVICE:
           memory.free();
           currentMemory = (::occa::modeMemory_t*) array;
+          syncState = DEVICE_SYNC;
           return 0;
       }
-      return 1;
+      return CeedError(ceed, 1, "Invalid CeedMemType passed");
     }
 
     int Vector::getArray(CeedMemType mtype,
@@ -164,7 +178,7 @@ namespace ceed {
           if (syncState == DEVICE_SYNC) {
             setCurrentMemoryIfNeeded();
             currentMemory.copyTo(currentHostBuffer);
-            syncState = HOST_SYNC;
+            syncState = BOTH_SYNC;
           }
           *array = currentHostBuffer;
           return 0;
@@ -173,12 +187,12 @@ namespace ceed {
           if (syncState == HOST_SYNC) {
             setCurrentHostBufferIfNeeded();
             currentMemory.copyFrom(currentHostBuffer);
-            syncState = DEVICE_SYNC;
+            syncState = BOTH_SYNC;
           }
-          *array = (CeedScalar*) currentMemory.getModeMemory();
+          *array = memoryToArray(currentMemory);
           return 0;
       }
-      return 1;
+      return CeedError(ceed, 1, "Invalid CeedMemType passed");
     }
 
     int Vector::restoreArray(CeedScalar **array) {
@@ -234,44 +248,44 @@ namespace ceed {
     int Vector::ceedSetArray(CeedVector vec, CeedMemType mtype,
                              CeedCopyMode cmode, CeedScalar *array) {
       Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->setArray(mtype, cmode, array);
+      if (!vector) {
+        return CeedError(NULL, 1, "Invalid CeedVector passed");
       }
-      return 1;
+      return vector->setArray(mtype, cmode, array);
     }
 
     int Vector::ceedGetArray(CeedVector vec, CeedMemType mtype,
                              CeedScalar **array) {
       Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->getArray(mtype, array);
+      if (!vector) {
+        return CeedError(NULL, 1, "Invalid CeedVector passed");
       }
-      return 1;
+      return vector->getArray(mtype, array);
     }
 
     int Vector::ceedGetArrayRead(CeedVector vec, CeedMemType mtype,
                                  const CeedScalar **array) {
       Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->getArray(mtype, array);
+      if (!vector) {
+        return CeedError(NULL, 1, "Invalid CeedVector passed");
       }
-      return 1;
+      return vector->getArray(mtype, array);
     }
 
     int Vector::ceedRestoreArray(CeedVector vec, CeedScalar **array) {
       Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->restoreArray(array);
+      if (!vector) {
+        return CeedError(NULL, 1, "Invalid CeedVector passed");
       }
-      return 1;
+      return vector->restoreArray(array);
     }
 
     int Vector::ceedRestoreArrayRead(CeedVector vec, CeedScalar **array) {
       Vector *vector = Vector::from(vec);
-      if (vector) {
-        return vector->restoreArray(array);
+      if (!vector) {
+        return CeedError(NULL, 1, "Invalid CeedVector passed");
       }
-      return 1;
+      return vector->restoreArray(array);
     }
 
     int Vector::ceedDestroy(CeedVector vec) {

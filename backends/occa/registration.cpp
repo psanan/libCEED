@@ -90,15 +90,19 @@ namespace ceed {
       // Valid:
       //   /cpu/occa
       //   /cpu/occa/
-      //   /*/occa/{mode: CUDA, device_id: 0}
-      //   /gpu/occa/{mode: CUDA, device_id: 0}
+      //   /*/occa/{mode:'CUDA',device_id:0}
+      //   /gpu/occa/{mode:'CUDA',device_id:0}
       // Invalid:
       //   /cpu/occa-not
       if (validResource) {
-        if (resource.size() > 9) {
-          validResource = (resource[9] == '/');
-          if (validResource && resource.size() > 10) {
-            resourceProps = resource.substr(10);
+        // Length of "/cpu/occa" and "/gpu/occa": 9
+        // Length of "/*/occa": 7
+        const size_t propsIndex = anyMode ? 7 : 9;
+
+        if (resource.size() > propsIndex) {
+          validResource = (resource[propsIndex] == '/');
+          if (validResource && resource.size() > (propsIndex + 1)) {
+            resourceProps = resource.substr(propsIndex + 1);
           }
         }
       }
