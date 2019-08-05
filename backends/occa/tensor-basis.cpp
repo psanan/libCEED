@@ -15,6 +15,9 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "tensor-basis.hpp"
+#include "kernels/tensor-basis-1d.okl"
+#include "kernels/tensor-basis-2d.okl"
+#include "kernels/tensor-basis-3d.okl"
 
 
 namespace ceed {
@@ -45,14 +48,14 @@ namespace ceed {
 
     //---[ Ceed Callbacks ]-------------
     int TensorBasis::ceedCreate(CeedInt dim,
-                                CeedInt P1d, CeedInt Q1d,
-                                const CeedScalar *interp1d,
-                                const CeedScalar *grad1d,
-                                const CeedScalar *qref1d,
-                                const CeedScalar *qweight1d,
+                                CeedInt P1D, CeedInt Q1D,
+                                const CeedScalar *interp1D,
+                                const CeedScalar *grad1D,
+                                const CeedScalar *qref1D,
+                                const CeedScalar *qweight1D,
                                 CeedBasis basis) {
       // Based on cuda-shared
-      if (Q1d < P1d) {
+      if (Q1D < P1D) {
         return CeedError(NULL, 1, "Backend does not implement underintegrated basis.");
       }
 
