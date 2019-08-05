@@ -107,7 +107,6 @@ LIBDIR := lib
 prefix ?= /usr/local
 bindir = $(prefix)/bin
 libdir = $(prefix)/lib
-okldir = $(libdir)/okl
 includedir = $(prefix)/include
 pkgconfigdir = $(libdir)/pkgconfig
 INSTALL = install
@@ -255,7 +254,6 @@ info:
 	$(info prefix        = $(prefix))
 	$(info includedir    = $(value includedir))
 	$(info libdir        = $(value libdir))
-	$(info okldir        = $(value okldir))
 	$(info pkgconfigdir  = $(value pkgconfigdir))
 	$(info ------------------------------------)
 	@true
@@ -491,25 +489,15 @@ $(OBJDIR)/ceed.pc : pkgconfig-prefix = $(prefix)
 %/ceed.pc : ceed.pc.template | $$(@D)/.DIR
 	@sed "s:%prefix%:$(pkgconfig-prefix):" $< > $@
 
-OCCA        := $(OCCA_DIR)/bin/occa
-OKL_KERNELS := $(wildcard backends/occa/*.okl)
-
-okl-cache :
-	$(OCCA) cache ceed $(OKL_KERNELS)
-
-okl-clear:
-	$(OCCA) clear -y -l ceed
-
 install : $(libceed) $(OBJDIR)/ceed.pc
 	$(INSTALL) -d $(addprefix $(if $(DESTDIR),"$(DESTDIR)"),"$(includedir)"\
-	  "$(libdir)" "$(pkgconfigdir)" $(if $(OCCA_ON),"$(okldir)"))
+	  "$(libdir)" "$(pkgconfigdir)"
 	$(INSTALL_DATA) include/ceed.h "$(DESTDIR)$(includedir)/"
 	$(INSTALL_DATA) include/ceedf.h "$(DESTDIR)$(includedir)/"
 	$(INSTALL_DATA) $(libceed) "$(DESTDIR)$(libdir)/"
 	$(INSTALL_DATA) $(OBJDIR)/ceed.pc "$(DESTDIR)$(pkgconfigdir)/"
-	$(if $(OCCA_ON),$(INSTALL_DATA) $(OKL_KERNELS) "$(DESTDIR)$(okldir)/")
 
-.PHONY : cln clean doc lib install all print test tst prove prv prove-all junit examples style tidy okl-cache okl-clear info info-backends
+.PHONY : cln clean doc lib install all print test tst prove prv prove-all junit examples style tidy info info-backends
 
 cln clean :
 	$(RM) -r $(OBJDIR) $(LIBDIR) dist *egg* .pytest_cache *cffi*
