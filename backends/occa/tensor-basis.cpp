@@ -25,7 +25,16 @@ namespace ceed {
     TensorBasis::TensorBasis() :
         isInitialized(false) {}
 
-    TensorBasis::~TensorBasis() {}
+    TensorBasis::~TensorBasis() {
+      interpKernel.free();
+      gradKernel.free();
+      weightKernel.free();
+      interp1D.free();
+      grad1D.free();
+      qWeight1D.free();
+      interpWeights.free();
+      interpGradWeights.free();
+    }
 
     int TensorBasis::setup() {
       if (isInitialized) {
@@ -60,7 +69,6 @@ namespace ceed {
       }
 
       int ierr;
-
       Ceed ceed;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
 

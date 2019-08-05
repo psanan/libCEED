@@ -22,6 +22,7 @@
 namespace ceed {
   namespace occa {
     Operator::Operator() :
+        ceed(NULL),
         ceedQ(0),
         ceedElementCount(0),
         ceedInputFieldCount(0),

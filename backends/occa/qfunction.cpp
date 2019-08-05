@@ -21,7 +21,12 @@
 namespace ceed {
   namespace occa {
     QFunction::QFunction(::occa::device device,
-                         const std::string &focca) {
+                         const std::string &focca) :
+        ceed(NULL),
+        ceedInputFields(0),
+        ceedOutputFields(0),
+        ceedContextSize(0),
+        *ceedContext(NULL) {
       const size_t colonIndex = focca.find(':');
       filename = focca.substr(0, colonIndex);
       kernelName = focca.substr(colonIndex + 1);

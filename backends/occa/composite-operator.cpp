@@ -19,7 +19,8 @@
 
 namespace ceed {
   namespace occa {
-    CompositeOperator::CompositeOperator() {}
+    CompositeOperator::CompositeOperator() :
+        ceed(NULL) {}
 
     CompositeOperator::~CompositeOperator() {}
 

@@ -28,6 +28,7 @@ namespace ceed {
     }
 
     Vector::Vector() :
+        ceed(NULL),
         length(0),
         hostBufferLength(0),
         hostBuffer(NULL),

@@ -19,7 +19,13 @@
 
 namespace ceed {
   namespace occa {
-    ElemRestriction::ElemRestriction() {}
+    ElemRestriction::ElemRestriction() :
+        ceed(NULL),
+        ceedElementCount(0),
+        ceedElementSize(0),
+        ceedComponentCount(0),
+        ceedDofCount(0),
+        ceedBlockSize(0) {}
 
     ElemRestriction::~ElemRestriction() {}
 

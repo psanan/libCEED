@@ -31,8 +31,8 @@ namespace ceed {
       ::occa::memory interp1D;
       ::occa::memory grad1D;
       ::occa::memory qWeight1D;
-      CeedScalar *c_B;
-      CeedScalar *c_G;
+      ::occa::memory interpWeights;
+      ::occa::memory interpGradWeights;
 
       TensorBasis();
 

@@ -26,7 +26,8 @@ namespace ceed {
      public:
       // Ceed object information
       Ceed ceed;
-      CeedInt ceedInputFields, ceedOutputFields;
+      CeedInt ceedInputFields;
+      CeedInt ceedOutputFields;
       size_t ceedContextSize;
       void *ceedContext;
 
