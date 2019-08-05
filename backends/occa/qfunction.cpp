@@ -26,7 +26,7 @@ namespace ceed {
         ceedInputFields(0),
         ceedOutputFields(0),
         ceedContextSize(0),
-        *ceedContext(NULL) {
+        ceedContext(NULL) {
       const size_t colonIndex = focca.find(':');
       filename = focca.substr(0, colonIndex);
       kernelName = focca.substr(colonIndex + 1);

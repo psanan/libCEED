@@ -24,35 +24,65 @@ namespace ceed {
   namespace occa {
     class TensorBasis : public Basis {
      public:
-      bool isInitialized;
-      ::occa::kernel interpKernel;
-      ::occa::kernel gradKernel;
-      ::occa::kernel weightKernel;
+      CeedInt dim;
+      CeedInt P1D;
+      CeedInt Q1D;
       ::occa::memory interp1D;
       ::occa::memory grad1D;
       ::occa::memory qWeight1D;
-      ::occa::memory interpWeights;
-      ::occa::memory interpGradWeights;
+      ::occa::kernelBuilder interpKernelBuilder;
+      ::occa::kernelBuilder gradKernelBuilder;
+      ::occa::kernelBuilder weightKernelBuilder;
 
-      TensorBasis();
+      TensorBasis(CeedBasis basis,
+                  CeedInt dim_,
+                  CeedInt P1D_,
+                  CeedInt Q1D_,
+                  const CeedScalar *interp1D_,
+                  const CeedScalar *grad1D_,
+                  const CeedScalar *qWeight1D_);
 
       ~TensorBasis();
 
-      int setup();
+      ::occa::device getDevice();
+
+      int applyInterp(const CeedInt elementCount,
+                      const bool transpose,
+                      Vector &U,
+                      Vector &V);
+
+      ::occa::kernel getInterpKernel();
+
+      int applyGrad(const CeedInt elementCount,
+                    const bool transpose,
+                    Vector &U,
+                    Vector &V);
+
+      ::occa::kernel getGradKernel();
+
+      int applyWeight(const CeedInt elementCount,
+                      Vector &W);
+
+      ::occa::kernel getWeightKernel();
+
+      ::occa::kernel buildEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                     const int elementsPerBlock,
+                                     const int sharedBufferSize);
 
       int apply(const CeedInt elementCount,
                 CeedTransposeMode tmode,
                 CeedEvalMode emode,
-                Vector *u,
-                Vector *v);
+                Vector *U,
+                Vector *V);
 
       //---[ Ceed Callbacks ]-----------
       static int ceedCreate(CeedInt dim,
-                            CeedInt P1d, CeedInt Q1d,
-                            const CeedScalar *interp1d,
-                            const CeedScalar *grad1d,
-                            const CeedScalar *qref1d,
-                            const CeedScalar *qweight1d,
+                            CeedInt P1D,
+                            CeedInt Q1D,
+                            const CeedScalar *interp1D,
+                            const CeedScalar *grad1D,
+                            const CeedScalar *qref1D,
+                            const CeedScalar *qWeight1D,
                             CeedBasis basis);
     };
   }

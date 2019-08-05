@@ -142,7 +142,7 @@ inline void contractTransposeY(const int px,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    const int transpose,
+                    const bool transpose,
                     @restrict const CeedScalar *B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -179,7 +179,7 @@ inline void contractTransposeY(const int px,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const int transpose,
+                  const bool transpose,
                   @restrict const CeedScalar *B,
                   @restrict const CeedScalar *Bx,
                   @restrict const CeedScalar *U,

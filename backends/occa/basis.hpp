@@ -39,6 +39,8 @@ namespace ceed {
       static Basis* from(CeedBasis basis);
       static Basis* from(CeedOperatorField operatorField);
 
+      int setCeedFields(CeedBasis basis);
+
       ::occa::device getDevice();
 
       virtual int apply(const CeedInt elementCount,

@@ -34,17 +34,7 @@ namespace ceed {
       Basis *basis_;
 
       ierr = CeedBasisGetData(basis, (void**) &basis_); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetCeed(basis, &basis_->ceed); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetDimension(basis, &basis_->ceedDim); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetNumComponents(basis, &basis_->ceedComponentCount); CeedOccaFromChk(ierr);
-      ierr = CeedBasisGetNumNodes(basis, &basis_->ceedNodeCount); CeedOccaFromChk(ierr);
-
-      if (dynamic_cast<TensorBasis*>(basis_)) {
-        ierr = CeedBasisGetNumQuadraturePoints1D(basis, &basis_->ceedQuadraturePointCount);
-      } else {
-        ierr = CeedBasisGetNumQuadraturePoints(basis, &basis_->ceedQuadraturePointCount);
-      }
-      CeedOccaFromChk(ierr);
+      ierr = basis_->setCeedFields(basis); CeedOccaFromChk(ierr);
 
       return basis_;
     }
@@ -54,6 +44,23 @@ namespace ceed {
       CeedBasis basis;
       ierr = CeedOperatorFieldGetBasis(operatorField, &basis); CeedOccaFromChk(ierr);
       return from(basis);
+    }
+
+    int Basis::setCeedFields(CeedBasis basis) {
+      int ierr;
+      ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
+      ierr = CeedBasisGetDimension(basis, &ceedDim); CeedChk(ierr);
+      ierr = CeedBasisGetNumComponents(basis, &ceedComponentCount); CeedChk(ierr);
+      ierr = CeedBasisGetNumNodes(basis, &ceedNodeCount); CeedChk(ierr);
+
+      if (dynamic_cast<TensorBasis*>(this)) {
+        ierr = CeedBasisGetNumQuadraturePoints1D(basis, &ceedQuadraturePointCount);
+      } else {
+        ierr = CeedBasisGetNumQuadraturePoints(basis, &ceedQuadraturePointCount);
+      }
+      CeedChk(ierr);
+
+      return 0;
     }
 
     ::occa::device Basis::getDevice() {

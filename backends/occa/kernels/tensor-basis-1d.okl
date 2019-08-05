@@ -97,7 +97,7 @@ inline void contractTransposeX(const int p,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    const int transpose,
+                    const bool transpose,
                     @restrict const CeedScalar *B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -130,9 +130,9 @@ inline void contractTransposeX(const int p,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const int transpose,
-                  @restrict const CeedScalar *G,
-                  @restrict const CeedScalar *U,
+                  const bool transpose,
+                  @restrict const CeedScalar *B,
+                  @restrict const CeedScalar *Bx,
                   @restrict CeedScalar *V) {
 
   for (int elementOffset = 0; elementOffset < elementCount; elementOffset += ELEMENTS_PER_BLOCK; @outer) {
@@ -147,12 +147,12 @@ inline void contractTransposeX(const int p,
             if (!transpose) {
               CeedScalar Vq;
               readDofs(element, localElement, component, q, U, sharedBuffer);
-              contractX(q, localElement, sharedBuffer, G, Vq);
+              contractX(q, localElement, sharedBuffer, Bx, Vq);
               writeQuads(elementCount, element, component, q, Vq, V);
             } else {
               CeedScalar Vp;
               readQuads(elementCount, element, localElement, component, q, U, sharedBuffer);
-              contractTransposeX(q, localElement, sharedBuffer, G, Vp);
+              contractTransposeX(q, localElement, sharedBuffer, Bx, Vp);
               writeDofs(element, component, q, Vp, V);
             }
           }

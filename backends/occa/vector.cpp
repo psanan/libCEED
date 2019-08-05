@@ -204,6 +204,16 @@ namespace ceed {
       return 0;
     }
 
+    Vector::operator ::occa::kernelArg() {
+      setCurrentMemoryIfNeeded();
+      if (syncState == HOST_SYNC) {
+        setCurrentHostBufferIfNeeded();
+        currentMemory.copyFrom(currentHostBuffer);
+        syncState = DEVICE_SYNC;
+      }
+      return currentMemory;
+    }
+
     //---[ Ceed Callbacks ]-----------
     int Vector::registerVectorFunction(Ceed ceed, CeedVector vec,
                                        const char *fname, ceed::occa::ceedFunction f) {
