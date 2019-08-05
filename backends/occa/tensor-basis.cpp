@@ -91,7 +91,8 @@ namespace ceed {
       interp(elementCount,
              transpose,
              interp1D,
-             U, V);
+             U.getConstKernelArg(),
+             V.getKernelArg());
       return 0;
     }
 
@@ -125,7 +126,8 @@ namespace ceed {
       grad(elementCount,
            transpose,
            interp1D, grad1D,
-           U, V);
+           U.getConstKernelArg(),
+           V.getKernelArg());
       return 0;
     }
 
@@ -154,7 +156,7 @@ namespace ceed {
     int TensorBasis::applyWeight(const CeedInt elementCount,
                                  Vector &W) {
       ::occa::kernel weight = getWeightKernel();
-      weight(elementCount, qWeight1D, W);
+      weight(elementCount, qWeight1D, W.getKernelArg());
       return 0;
     }
 

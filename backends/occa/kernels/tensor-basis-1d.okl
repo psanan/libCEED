@@ -133,6 +133,7 @@ inline void contractTransposeX(const int p,
                   const bool transpose,
                   @restrict const CeedScalar *B,
                   @restrict const CeedScalar *Bx,
+                  @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
 
   for (int elementOffset = 0; elementOffset < elementCount; elementOffset += ELEMENTS_PER_BLOCK; @outer) {

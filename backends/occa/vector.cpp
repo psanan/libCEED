@@ -204,12 +204,22 @@ namespace ceed {
       return 0;
     }
 
-    Vector::operator ::occa::kernelArg() {
+    ::occa::memory Vector::getKernelArg() {
       setCurrentMemoryIfNeeded();
       if (syncState == HOST_SYNC) {
         setCurrentHostBufferIfNeeded();
         currentMemory.copyFrom(currentHostBuffer);
         syncState = DEVICE_SYNC;
+      }
+      return currentMemory;
+    }
+
+    ::occa::memory Vector::getConstKernelArg() {
+      setCurrentMemoryIfNeeded();
+      if (syncState == HOST_SYNC) {
+        setCurrentHostBufferIfNeeded();
+        currentMemory.copyFrom(currentHostBuffer);
+        syncState = BOTH_SYNC;
       }
       return currentMemory;
     }

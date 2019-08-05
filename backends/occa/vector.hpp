@@ -81,7 +81,9 @@ namespace ceed {
 
       int restoreArray(const CeedScalar **array);
 
-      operator ::occa::kernelArg();
+      ::occa::memory getKernelArg();
+
+      ::occa::memory getConstKernelArg();
 
       //---[ Ceed Callbacks ]-----------
       static int registerVectorFunction(Ceed ceed, CeedVector vec,
