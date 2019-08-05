@@ -14,13 +14,13 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#ifndef CEED_OCCA_KERNELS_TENSORBASIS1D_HEADER
-#define CEED_OCCA_KERNELS_TENSORBASIS1D_HEADER
+#ifndef CEED_OCCA_KERNELS_TENSORBASIS_GPU_TENSORBASIS1D_HEADER
+#define CEED_OCCA_KERNELS_TENSORBASIS_GPU_TENSORBASIS1D_HEADER
 
-#include "header.hpp"
+#include "../../kernel-defines.hpp"
 
 
-static const char *tensorBasis1DSource = STRINGIFY_SOURCE(
+static const char *tensorBasis1D_gpu_source = STRINGIFY_SOURCE(
 
 typedef       CeedScalar* batchedDofArray       @dim(P1D, BASIS_COMPONENT_COUNT, elementCount);
 typedef const CeedScalar* const_batchedDofArray @dim(P1D, BASIS_COMPONENT_COUNT, elementCount);

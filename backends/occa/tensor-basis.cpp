@@ -15,9 +15,7 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "tensor-basis.hpp"
-#include "kernels/tensor-basis-1d.okl"
-#include "kernels/tensor-basis-2d.okl"
-#include "kernels/tensor-basis-3d.okl"
+#include "kernels/tensor-basis.hpp"
 
 
 namespace ceed {
@@ -44,13 +42,13 @@ namespace ceed {
       const char *kernelSource = NULL;
       std::string sharedBufferSize;
       if (dim == 1) {
-        kernelSource = tensorBasis1DSource;
+        kernelSource = tensorBasis1D_gpu_source;
         sharedBufferSize = "(Q1D * ELEMENTS_PER_BLOCK)";
       } else if (dim == 2) {
-        kernelSource = tensorBasis2DSource;
+        kernelSource = tensorBasis2D_gpu_source;
         sharedBufferSize = "(Q1D * Q1D * BASIS_COMPONENT_COUNT * ELEMENTS_PER_BLOCK)";
       } else {
-        kernelSource = tensorBasis3DSource;
+        kernelSource = tensorBasis3D_gpu_source;
         sharedBufferSize = "(Q1D * Q1D * BASIS_COMPONENT_COUNT * ELEMENTS_PER_BLOCK)";
       }
 
