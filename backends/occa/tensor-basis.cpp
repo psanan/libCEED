@@ -119,11 +119,13 @@ namespace ceed {
         ? getGpuInterpKernel(transpose)
         : getCpuInterpKernel(transpose)
       );
+
       interp(elementCount,
              transpose,
              interp1D,
              U.getConstKernelArg(),
              V.getKernelArg());
+
       return 0;
     }
 
@@ -166,11 +168,13 @@ namespace ceed {
         ? getGpuGradKernel(transpose)
         : getCpuGradKernel(transpose)
       );
+
       grad(elementCount,
            transpose,
            interp1D, grad1D,
            U.getConstKernelArg(),
            V.getKernelArg());
+
       return 0;
     }
 
@@ -211,7 +215,9 @@ namespace ceed {
         ? getGpuWeightKernel()
         : getCpuWeightKernel()
       );
+
       weight(elementCount, qWeight1D, W.getKernelArg());
+
       return 0;
     }
 
@@ -267,6 +273,8 @@ namespace ceed {
                            CeedEvalMode emode,
                            Vector *U,
                            Vector *V) {
+      const bool transpose = tmode == CEED_TRANSPOSE;
+
       if ((dim < 1) || (3 < dim)) {
         return CeedError(
           NULL, 1,
@@ -275,28 +283,17 @@ namespace ceed {
       }
 
       // Check arguments
-      switch (emode) {
-        case CEED_EVAL_INTERP:
-        case CEED_EVAL_GRAD:
-          if (!U) {
-            return CeedError(NULL, 1, "Incorrect CeedVector input: U");
-          }
-          if (!V) {
-            return CeedError(NULL, 1, "Incorrect CeedVector input: V");
-          }
-          break;
-        case CEED_EVAL_WEIGHT:
-          if (!V) {
-            return CeedError(NULL, 1, "Incorrect CeedVector input: V");
-          }
-          break;
-        default:
-          return CeedError(NULL, 1, "Backend does not support eval mode: %i", (int) emode);
+      if (emode != CEED_EVAL_WEIGHT) {
+        if (!U) {
+          return CeedError(NULL, 1, "Incorrect CeedVector input: U");
+        }
+      }
+      if (!V) {
+        return CeedError(NULL, 1, "Incorrect CeedVector input: V");
       }
 
       try {
         // Apply kernel
-        const bool transpose = tmode == CEED_TRANSPOSE;
         switch (emode) {
           case CEED_EVAL_INTERP:
             return applyInterp(elementCount, transpose, *U, *V);
@@ -304,7 +301,8 @@ namespace ceed {
             return applyGrad(elementCount, transpose, *U, *V);
           case CEED_EVAL_WEIGHT:
             return applyWeight(elementCount, *V);
-          default: {}
+          default:
+            return CeedError(NULL, 1, "Backend does not support eval mode: %i", (int) emode);
         }
       } catch (::occa::exception exc) {
         // Handle kernel build errors the CEED way

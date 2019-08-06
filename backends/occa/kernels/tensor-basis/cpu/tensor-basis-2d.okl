@@ -53,8 +53,8 @@ inline void interpElement(const int elementCount,
 
   for (int py = 0; py < P1D; ++py) {
     CeedScalar V_x[Q1D];
-    for (int qy = 0; qy < Q1D; ++qy) {
-      V_x[qy] = 0;
+    for (int qx = 0; qx < Q1D; ++qx) {
+      V_x[qx] = 0;
     }
 
     for (int px = 0; px < P1D; ++px) {
@@ -229,7 +229,7 @@ inline void gradElementTranspose(const int elementCount,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
   CeedScalar B_pq[P1D * Q1D] @dim(P1D, Q1D);
-  if (TRANSPOSE) {
+  if (!TRANSPOSE) {
     for (int q = 0; q < Q1D; ++q) {
       for (int p = 0; p < P1D; ++p) {
         B_pq(p, q) = B_qp(q, p);
@@ -240,9 +240,9 @@ inline void gradElementTranspose(const int elementCount,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(elementCount, element, component, B_pq, U, V);
+        interpElement(elementCount, element, component, B_qp, U, V);
       } else {
-        interpElementTranspose(elementCount, element, component, B_qp, U, V);
+        interpElementTranspose(elementCount, element, component, B_pq, U, V);
       }
     }
   }
@@ -256,7 +256,7 @@ inline void gradElementTranspose(const int elementCount,
                   @restrict CeedScalar *V) {
   CeedScalar B_pq[P1D * Q1D]  @dim(P1D, Q1D);
   CeedScalar Bx_pq[P1D * Q1D] @dim(P1D, Q1D);
-  if (TRANSPOSE) {
+  if (!TRANSPOSE) {
     for (int q = 0; q < Q1D; ++q) {
       for (int p = 0; p < P1D; ++p) {
         B_pq(q, p)  = B_qp(p, q);
@@ -270,7 +270,7 @@ inline void gradElementTranspose(const int elementCount,
       if (!TRANSPOSE) {
         gradElement(elementCount, element, component, B_pq, Bx_pq, U, V);
       } else {
-        gradElementTranspose(elementCount, element, component, B_pq, Bx_pq, U, V);
+        gradElementTranspose(elementCount, element, component, B_qp, Bx_qp, U, V);
       }
     }
   }
