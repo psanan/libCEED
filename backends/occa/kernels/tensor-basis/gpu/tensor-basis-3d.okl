@@ -29,7 +29,7 @@ typedef       CeedScalar* batchedQuadArray       @dim(Q1D, Q1D, Q1D, elementCoun
 typedef const CeedScalar* const_batchedQuadArray @dim(Q1D, Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 3);
 
 typedef CeedScalar* sharedBufferArray  @dim(Q1D, Q1D, BASIS_COMPONENT_COUNT);
-typedef const CeedScalar* dofToQuadMap @dim(P1D, Q1D);
+typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
 typedef CeedScalar* elementWeightArray @dim(Q1D, Q1D, Q1D, elementCount);
 
 
@@ -102,7 +102,7 @@ inline void contractX(const int qx,
                       const int qy,
                       const int component,
                       sharedBufferArray sharedBuffer,
-                      dofToQuadMap B,
+                      quadToDof B,
                       const CeedScalar *Uq,
                       CeedScalar *Vp) {
   for (int pz = 0; pz < P1D; ++pz) {
@@ -120,7 +120,7 @@ inline void contractY(const int qx,
                       const int qy,
                       const int component,
                       sharedBufferArray sharedBuffer,
-                      dofToQuadMap B,
+                      quadToDof B,
                       const CeedScalar *Uq,
                       CeedScalar *Vp) {
   for (int pz = 0; pz < P1D; ++pz) {
@@ -136,7 +136,7 @@ inline void contractY(const int qx,
 
 inline void contractZ(const int qx,
                       const int qy,
-                      dofToQuadMap B,
+                      quadToDof B,
                       const CeedScalar *Up,
                       CeedScalar *Vq) {
   for (int qz = 0; qz < Q1D; ++qz) {
@@ -151,7 +151,7 @@ inline void contractTransposeX(const int px,
                                const int py,
                                const int component,
                                sharedBufferArray sharedBuffer,
-                               dofToQuadMap B,
+                               quadToDof B,
                                const CeedScalar *Up,
                                CeedScalar *Vp) {
   for (int pz = 0; pz < P1D; ++pz) {
@@ -171,7 +171,7 @@ inline void contractTransposeY(const int px,
                                const int py,
                                const int component,
                                sharedBufferArray sharedBuffer,
-                               dofToQuadMap B,
+                               quadToDof B,
                                const CeedScalar *Up,
                                CeedScalar *Vp) {
   for (int pz = 0; pz < P1D; ++pz) {
@@ -189,7 +189,7 @@ inline void contractTransposeY(const int px,
 
 inline void contractTransposeZ(const int px,
                                const int py,
-                               dofToQuadMap B,
+                               quadToDof B,
                                const CeedScalar *Uq,
                                CeedScalar *Vq) {
   for (int qz = 0; qz < Q1D; ++qz) {
@@ -204,7 +204,7 @@ inline void contractTransposeZ(const int px,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    @restrict dofToQuadMap B,
+                    @restrict quadToDof B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
 
@@ -244,8 +244,8 @@ inline void contractTransposeZ(const int px,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  @restrict dofToQuadMap B,
-                  @restrict dofToQuadMap Bx,
+                  @restrict quadToDof B,
+                  @restrict quadToDof Bx,
                   @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
 

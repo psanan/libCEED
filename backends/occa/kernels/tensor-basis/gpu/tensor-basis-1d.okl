@@ -29,7 +29,7 @@ typedef       CeedScalar* batchedQuadArray       @dim(Q1D, elementCount, BASIS_C
 typedef const CeedScalar* const_batchedQuadArray @dim(Q1D, elementCount, BASIS_COMPONENT_COUNT);
 
 typedef CeedScalar* sharedBufferArray  @dim(Q1D, ELEMENTS_PER_BLOCK);
-typedef const CeedScalar* dofToQuadMap @dim(P1D, Q1D);
+typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
 typedef CeedScalar* elementWeightArray @dim(Q1D, elementCount);
 
 
@@ -80,7 +80,7 @@ inline void writeQuads(const int elementCount,
 inline void contractX(const int q,
                       const int localElement,
                       sharedBufferArray sharedBuffer,
-                      dofToQuadMap B,
+                      quadToDof B,
                       CeedScalar &V) {
   V = 0.0;
   for (int p = 0; p < P1D; ++p) {
@@ -91,7 +91,7 @@ inline void contractX(const int q,
 inline void contractTransposeX(const int p,
                                const int localElement,
                                sharedBufferArray sharedBuffer,
-                               dofToQuadMap B,
+                               quadToDof B,
                                CeedScalar &V) {
   V = 0.0;
   for (int q = 0; q < Q1D; ++q) {
@@ -101,7 +101,7 @@ inline void contractTransposeX(const int p,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    @restrict dofToQuadMap B,
+                    @restrict quadToDof B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
 
@@ -133,8 +133,8 @@ inline void contractTransposeX(const int p,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  @restrict dofToQuadMap B,
-                  @restrict dofToQuadMap Bx,
+                  @restrict quadToDof B,
+                  @restrict quadToDof Bx,
                   @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
 
