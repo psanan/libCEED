@@ -38,8 +38,8 @@ inline void interpElement(const int elementCount,
                           @restrict dofToQuad B,
                           @restrict const_dofArray U,
                           @restrict quadArray V) {
-  const CeedScalar *Ue = &(U(0, component, element));
-  CeedScalar *Ve = &(V(0, element, component));
+  @restrict const CeedScalar *Ue = &(U(0, component, element));
+  @restrict CeedScalar *Ve = &(V(0, element, component));
 
   for (int q = 0; q < Q1D; ++q) {
     Ve[q] = 0;
@@ -59,8 +59,8 @@ inline void interpElementTranspose(const int elementCount,
                                    @restrict quadToDof B,
                                    @restrict const_quadArray U,
                                    @restrict dofArray V) {
-  const CeedScalar *Ue = &(U(0, element, component));
-  CeedScalar *Ve = &(V(0, component, element));
+  @restrict const CeedScalar *Ue = &(U(0, element, component));
+  @restrict CeedScalar *Ve = &(V(0, component, element));
 
   for (int p = 0; p < P1D; ++p) {
     Ve[p] = 0;
@@ -87,8 +87,8 @@ inline void interpElementTranspose(const int elementCount,
     }
   }
 
-  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
-    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component; @inner) {
       if (!TRANSPOSE) {
         interpElement(elementCount, element, component, B_pq, U, V);
       } else {
@@ -112,8 +112,8 @@ inline void interpElementTranspose(const int elementCount,
     }
   }
 
-  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
-    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component; @inner) {
       if (!TRANSPOSE) {
         interpElement(elementCount, element, component, Bx_pq, U, V);
       } else {

@@ -236,8 +236,8 @@ inline void gradElementTranspose(const int elementCount,
     }
   }
 
-  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
-    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component; @inner) {
       if (!TRANSPOSE) {
         interpElement(elementCount, element, component, B_pq, U, V);
       } else {
@@ -263,8 +263,8 @@ inline void gradElementTranspose(const int elementCount,
     }
   }
 
-  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
-    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component; @inner) {
       if (!TRANSPOSE) {
         gradElement(elementCount, element, component, B_pq, Bx_pq, U, V);
       } else {
