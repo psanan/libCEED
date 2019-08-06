@@ -54,8 +54,8 @@ namespace ceed {
       }
 
       ::occa::dtype_t ceedScalarDtype = ::occa::dtype::get<CeedScalar>();
-      interp1D  = device.malloc(P1D, ceedScalarDtype, interp1D_);
-      grad1D    = device.malloc(P1D, ceedScalarDtype, grad1D_);
+      interp1D  = device.malloc(P1D * Q1D, ceedScalarDtype, interp1D_);
+      grad1D    = device.malloc(P1D * Q1D, ceedScalarDtype, grad1D_);
       qWeight1D = device.malloc(Q1D, ceedScalarDtype, qWeight1D_);
 
       setupKernelBuilders();

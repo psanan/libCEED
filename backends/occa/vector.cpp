@@ -209,8 +209,8 @@ namespace ceed {
       if (syncState == HOST_SYNC) {
         setCurrentHostBufferIfNeeded();
         currentMemory.copyFrom(currentHostBuffer);
-        syncState = DEVICE_SYNC;
       }
+      syncState = DEVICE_SYNC;
       return currentMemory;
     }
 
@@ -220,6 +220,8 @@ namespace ceed {
         setCurrentHostBufferIfNeeded();
         currentMemory.copyFrom(currentHostBuffer);
         syncState = BOTH_SYNC;
+      } else {
+        syncState = DEVICE_SYNC;
       }
       return currentMemory;
     }
