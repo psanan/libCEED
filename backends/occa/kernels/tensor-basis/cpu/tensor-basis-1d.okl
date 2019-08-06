@@ -38,16 +38,17 @@ inline void interpElement(const int elementCount,
                           @restrict dofToQuad B,
                           @restrict const_dofArray U,
                           @restrict quadArray V) {
+  const CeedScalar *Ue = &(U(0, component, element));
   CeedScalar *Ve = &(V(0, element, component));
 
   for (int q = 0; q < Q1D; ++q) {
-    V[q] = 0;
+    Ve[q] = 0;
   }
 
   for (int p = 0; p < P1D; ++p) {
-    const CeedScalar Up = U(p, element, component);
+    const CeedScalar Up = Ue[p];
     for (int q = 0; q < Q1D; ++q) {
-      V[q] += B(q, p) * Up;
+      Ve[q] += B(q, p) * Up;
     }
   }
 }
@@ -58,16 +59,17 @@ inline void interpElementTranspose(const int elementCount,
                                    @restrict quadToDof B,
                                    @restrict const_quadArray U,
                                    @restrict dofArray V) {
-  CeedScalar *Ve = &(V(0, element, component));
+  const CeedScalar *Ue = &(U(0, element, component));
+  CeedScalar *Ve = &(V(0, component, element));
 
   for (int p = 0; p < P1D; ++p) {
-    V[p] = 0;
+    Ve[p] = 0;
   }
 
   for (int q = 0; q < Q1D; ++q) {
-    const CeedScalar Uq = U(q, element, component);
+    const CeedScalar Uq = Ue[q];
     for (int p = 0; p < P1D; ++p) {
-      V[p] += B(p, q) * Uq;
+      Ve[p] += B(p, q) * Uq;
     }
   }
 }
