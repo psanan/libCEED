@@ -71,6 +71,9 @@ namespace ceed {
       ::occa::kernel getCpuWeightKernel();
       ::occa::kernel getGpuWeightKernel();
 
+      ::occa::kernel buildCpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                        const bool transpose);
+
       ::occa::kernel buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
                                         const bool transpose,
                                         const int elementsPerBlock,

@@ -32,10 +32,11 @@ typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
 typedef const CeedScalar* dofToQuad @dim(Q1D, P1D);
 typedef CeedScalar* elementWeightArray @dim(Q1D, elementCount);
 
-inline void interpElement(const int element,
-                          const int compnent,
+inline void interpElement(const int elementCount,
+                          const int element,
+                          const int component,
                           @restrict dofToQuad B,
-                          @restrict const_dofArray CeedScalar U,
+                          @restrict const_dofArray U,
                           @restrict quadArray V) {
   CeedScalar *Ve = &(V(0, element, component));
 
@@ -51,8 +52,9 @@ inline void interpElement(const int element,
   }
 }
 
-inline void interpElementTranspose(const int element,
-                                   const int compnent,
+inline void interpElementTranspose(const int elementCount,
+                                   const int element,
+                                   const int component,
                                    @restrict quadToDof B,
                                    @restrict const_quadArray U,
                                    @restrict dofArray V) {
@@ -87,9 +89,9 @@ inline void interpElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(element, component, B_pq, U, V);
+        interpElement(elementCount, element, component, B_pq, U, V);
       } else {
-        interpElementTranspose(element, component, B_qp, U, V);
+        interpElementTranspose(elementCount, element, component, B_qp, U, V);
       }
     }
   }
@@ -113,9 +115,9 @@ inline void interpElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(element, component, Bx_pq, U, V);
+        interpElement(elementCount, element, component, Bx_pq, U, V);
       } else {
-        interpElementTranspose(element, component, Bx_qp, U, V);
+        interpElementTranspose(elementCount, element, component, Bx_qp, U, V);
       }
     }
   }

@@ -88,8 +88,8 @@ namespace ceed {
 
       const char *kernelSource = (
         usingGPU
-        ? gpuKernelSources[dim]
-        : cpuKernelSources[dim]
+        ? gpuKernelSources[dim - 1]
+        : cpuKernelSources[dim - 1]
       );
 
       ::occa::properties kernelProps;
@@ -128,6 +128,8 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuInterpKernel(const bool transpose) {
+      return buildCpuEvalKernel(interpKernelBuilder,
+                                transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuInterpKernel(const bool transpose) {
@@ -173,6 +175,8 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuGradKernel(const bool transpose) {
+      return buildCpuEvalKernel(gradKernelBuilder,
+                                transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuGradKernel(const bool transpose) {
@@ -212,6 +216,8 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuWeightKernel() {
+      return buildCpuEvalKernel(weightKernelBuilder,
+                                false);
     }
 
     ::occa::kernel TensorBasis::getGpuWeightKernel() {
@@ -232,6 +238,15 @@ namespace ceed {
                                 false,
                                 elementsPerBlock,
                                 1);
+    }
+
+    ::occa::kernel TensorBasis::buildCpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                                   const bool transpose) {
+
+      ::occa::properties kernelProps;
+      kernelProps["defines/TRANSPOSE"] = transpose;
+
+      return kernelBuilder.build(getDevice(), kernelProps);
     }
 
     ::occa::kernel TensorBasis::buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,

@@ -32,7 +32,8 @@ typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
 typedef const CeedScalar* dofToQuad @dim(Q1D, P1D);
 typedef CeedScalar* elementWeightArray @dim(Q1D, Q1D, Q1D, elementCount);
 
-inline void interpElement(const int element,
+inline void interpElement(const int elementCount,
+                          const int element,
                           const int component,
                           @restrict quadToDof B,
                           @restrict const_dofArray U,
@@ -41,7 +42,7 @@ inline void interpElement(const int element,
     &(U(0, 0, 0, component, element))
   );
   @restrict CeedScalar *Ve @dim(Q1D, Q1D, Q1D) = (
-    &(V(0, 0, 0, element, component))
+    &(V(0, 0, 0, element, component, 0))
   );
 
   for (int qz = 0; qz < Q1D; ++qz) {
@@ -92,13 +93,14 @@ inline void interpElement(const int element,
   }
 }
 
-inline void interpElementTranspose(const int element,
+inline void interpElementTranspose(const int elementCount,
+                                   const int element,
                                    const int component,
                                    @restrict dofToQuad B,
                                    @restrict const_quadArray U,
                                    @restrict dofArray V) {
   @restrict const CeedScalar *Ue @dim(Q1D, Q1D, Q1D) = (
-    &(U(0, 0, 0, element, component))
+    &(U(0, 0, 0, element, component, 0))
   );
   @restrict CeedScalar *Ve @dim(P1D, P1D, P1D) = (
     &(V(0, 0, 0, component, element))
@@ -113,46 +115,47 @@ inline void interpElementTranspose(const int element,
   }
 
   for (int qz = 0; qz < Q1D; ++qz) {
-    CeedScalar V_xy[D1D][D1D];
-    for (int py = 0; py < D1D; ++py) {
-      for (int px = 0; px < D1D; ++px) {
+    CeedScalar V_xy[P1D][P1D];
+    for (int py = 0; py < P1D; ++py) {
+      for (int px = 0; px < P1D; ++px) {
         V_xy[py][px] = 0;
       }
     }
 
     for (int qy = 0; qy < Q1D; ++qy) {
-      CeedScalar V_x[D1D];
-      for (int px = 0; px < D1D; ++px) {
+      CeedScalar V_x[P1D];
+      for (int px = 0; px < P1D; ++px) {
         V_x[px] = 0;
       }
 
       for (int qx = 0; qx < Q1D; ++qx) {
         const CeedScalar Uq = Ue(qx, qy, qz);
-        for (int px = 0; px < D1D; ++px) {
+        for (int px = 0; px < P1D; ++px) {
           V_x[px] += B(px, qx) * Uq;
         }
       }
 
-      for (int py = 0; py < D1D; ++py) {
+      for (int py = 0; py < P1D; ++py) {
         const CeedScalar wy = B(py, qy);
-        for (int px = 0; px < D1D; ++px) {
+        for (int px = 0; px < P1D; ++px) {
           V_xy[py][px] += wy * V_x[px];
         }
       }
     }
 
-    for (int pz = 0; pz < D1D; ++pz) {
+    for (int pz = 0; pz < P1D; ++pz) {
       const CeedScalar wz = B(pz, qz);
-      for (int py = 0; py < D1D; ++py) {
-        for (int px = 0; px < D1D; ++px) {
-          V_e(px, py, pz) += wz * V_xy[py][px];
+      for (int py = 0; py < P1D; ++py) {
+        for (int px = 0; px < P1D; ++px) {
+          Ve(px, py, pz) += wz * V_xy[py][px];
         }
       }
     }
   }
 }
 
-inline void gradElement(const int element,
+inline void gradElement(const int elementCount,
+                        const int element,
                         const int component,
                         @restrict dofToQuad B,
                         @restrict dofToQuad Bx,
@@ -233,7 +236,8 @@ inline void gradElement(const int element,
   }
 }
 
-inline void gradElementTranspose(const int element,
+inline void gradElementTranspose(const int elementCount,
+                                 const int element,
                                  const int component,
                                  @restrict quadToDof B,
                                  @restrict quadToDof Bx,
@@ -271,9 +275,9 @@ inline void gradElementTranspose(const int element,
       }
 
       for (int qx = 0; qx < Q1D; ++qx) {
-        const CeedScalar Ux = Ve_x(qz, qy, qx);
-        const CeedScalar Uy = Ve_y(qz, qy, qx);
-        const CeedScalar Uz = Ve_z(qz, qy, qx);
+        const CeedScalar Ux = Ue_x(qz, qy, qx);
+        const CeedScalar Uy = Ue_y(qz, qy, qx);
+        const CeedScalar Uz = Ue_z(qz, qy, qx);
         for (int px = 0; px < P1D; ++px) {
           const CeedScalar wx  = B(px, qx);
           const CeedScalar wDx = Bx(px, qx);
@@ -299,7 +303,7 @@ inline void gradElementTranspose(const int element,
       const CeedScalar wDz = Bx(pz, qz);
       for (int py = 0; py < P1D; ++py) {
         for (int px = 0; px < P1D; ++px) {
-          Ue(px, py, pz) += ((gradXY[py][px][0] * wz) +
+          Ve(px, py, pz) += ((gradXY[py][px][0] * wz) +
                              (gradXY[py][px][1] * wz) +
                              (gradXY[py][px][2] * wDz));
         }
@@ -310,7 +314,7 @@ inline void gradElementTranspose(const int element,
 
 @kernel void interp(const CeedInt elementCount,
                     const bool transpose,
-                    @restrict dofToQuadMap B,
+                    @restrict quadToDof B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
   CeedScalar B_pq[Q1D * P1D] @dim(P1D, Q1D);
@@ -325,9 +329,9 @@ inline void gradElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(element, component, B, U, V);
+        interpElement(elementCount, element, component, B, U, V);
       } else {
-        interpElementTranspose(element, component, B, U, V);
+        interpElementTranspose(elementCount, element, component, B, U, V);
       }
     }
   }
@@ -353,9 +357,9 @@ inline void gradElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        gradElement(element, component, B_pq, Bx_pq, U, V);
+        gradElement(elementCount, element, component, B_pq, Bx_pq, U, V);
       } else {
-        gradElementTranspose(element, component, B_pq, Bx_pq, U, V);
+        gradElementTranspose(elementCount, element, component, B_pq, Bx_pq, U, V);
       }
     }
   }

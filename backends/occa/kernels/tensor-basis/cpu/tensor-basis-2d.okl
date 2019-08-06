@@ -32,7 +32,8 @@ typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
 typedef const CeedScalar* dofToQuad @dim(Q1D, P1D);
 typedef CeedScalar* elementWeightArray @dim(Q1D, Q1D, elementCount);
 
-inline void interpElement(const int element,
+inline void interpElement(const int elementCount,
+                          const int element,
                           const int component,
                           @restrict quadToDof B,
                           @restrict const_dofArray U,
@@ -41,7 +42,7 @@ inline void interpElement(const int element,
     &(U(0, 0, component, element))
   );
   @restrict CeedScalar *Ve @dim(Q1D, Q1D) = (
-    &(V(0, 0, element, component))
+    &(V(0, 0, element, component, 0))
   );
 
   for (int qy = 0; qy < Q1D; ++qy) {
@@ -72,13 +73,14 @@ inline void interpElement(const int element,
   }
 }
 
-inline void interpElementTranspose(const int element,
+inline void interpElementTranspose(const int elementCount,
+                                   const int element,
                                    const int component,
                                    @restrict dofToQuad B,
                                    @restrict const_quadArray U,
                                    @restrict dofArray V) {
   @restrict const CeedScalar *Ue @dim(Q1D, Q1D) = (
-    &(U(0, 0, element, component))
+    &(U(0, 0, element, component, 0))
   );
   @restrict CeedScalar *Ve @dim(P1D, P1D) = (
     &(V(0, 0, element, component))
@@ -112,7 +114,8 @@ inline void interpElementTranspose(const int element,
   }
 }
 
-inline void gradElement(const int element,
+inline void gradElement(const int elementCount,
+                        const int element,
                         const int component,
                         @restrict dofToQuad B,
                         @restrict dofToQuad Bx,
@@ -168,7 +171,8 @@ inline void gradElement(const int element,
   }
 }
 
-inline void gradElementTranspose(const int element,
+inline void gradElementTranspose(const int elementCount,
+                                 const int element,
                                  const int component,
                                  @restrict quadToDof B,
                                  @restrict quadToDof Bx,
@@ -221,7 +225,7 @@ inline void gradElementTranspose(const int element,
 
 @kernel void interp(const CeedInt elementCount,
                     const bool transpose,
-                    @restrict dofToQuadMap B_qp,
+                    @restrict quadToDof B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
   CeedScalar B_pq[P1D * Q1D] @dim(P1D, Q1D);
@@ -236,9 +240,9 @@ inline void gradElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(element, component, B_pq, U, V);
+        interpElement(elementCount, element, component, B_pq, U, V);
       } else {
-        interpElementTranspose(element, component, B_qp, U, V);
+        interpElementTranspose(elementCount, element, component, B_qp, U, V);
       }
     }
   }
@@ -264,9 +268,9 @@ inline void gradElementTranspose(const int element,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        gradElement(element, component, B_pq, Bx_pq, U, V);
+        gradElement(elementCount, element, component, B_pq, Bx_pq, U, V);
       } else {
-        gradElementTranspose(element, component, B_pq, Bx_pq, U, V);
+        gradElementTranspose(elementCount, element, component, B_pq, Bx_pq, U, V);
       }
     }
   }
