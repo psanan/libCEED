@@ -22,11 +22,11 @@
 
 static const char *tensorBasis2D_gpu_source = STRINGIFY_SOURCE(
 
-typedef       CeedScalar* batchedDofArray       @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
-typedef const CeedScalar* const_batchedDofArray @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef       CeedScalar* dofArray       @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef const CeedScalar* const_dofArray @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
 
-typedef       CeedScalar* batchedQuadArray       @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
-typedef const CeedScalar* const_batchedQuadArray @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
+typedef       CeedScalar* quadArray       @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
+typedef const CeedScalar* const_quadArray @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
 
 typedef CeedScalar* sharedBufferArray  @dim(Q1D, Q1D, ELEMENTS_PER_BLOCK);
 typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
@@ -38,7 +38,7 @@ inline void readDofs(const int element,
                      const int component,
                      const int px,
                      const int py,
-                     const_batchedDofArray U,
+                     const_dofArray U,
                      CeedScalar &Up) {
   // Zero out extra entries
   Up = (
@@ -53,7 +53,7 @@ inline void writeDofs(const int element,
                       const int px,
                       const int py,
                       const CeedScalar Vp,
-                      batchedDofArray V) {
+                      dofArray V) {
   if ((px < P1D) && (py < P1D)) {
     V(px, py, component, element) = Vp;
   }
@@ -65,7 +65,7 @@ inline void readQuads(const int elementCount,
                       const int qx,
                       const int qy,
                       const int dim,
-                      const_batchedQuadArray U,
+                      const_quadArray U,
                       CeedScalar &Uq) {
   Uq = U(qx, qy, element, component, dim);
 }
@@ -77,7 +77,7 @@ inline void writeQuads(const int elementCount,
                        const int qy,
                        const int dim,
                        const CeedScalar Vq,
-                       batchedQuadArray V) {
+                       quadArray V) {
   V(qx, qy, element, component, dim) = Vq;
 }
 

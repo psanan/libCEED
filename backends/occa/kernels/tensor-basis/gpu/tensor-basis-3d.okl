@@ -22,11 +22,11 @@
 
 static const char *tensorBasis3D_gpu_source = STRINGIFY_SOURCE(
 
-typedef       CeedScalar* batchedDofArray       @dim(P1D, P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
-typedef const CeedScalar* const_batchedDofArray @dim(P1D, P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef       CeedScalar* dofArray       @dim(P1D, P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef const CeedScalar* const_dofArray @dim(P1D, P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
 
-typedef       CeedScalar* batchedQuadArray       @dim(Q1D, Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 3);
-typedef const CeedScalar* const_batchedQuadArray @dim(Q1D, Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 3);
+typedef       CeedScalar* quadArray       @dim(Q1D, Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 3);
+typedef const CeedScalar* const_quadArray @dim(Q1D, Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 3);
 
 typedef CeedScalar* sharedBufferArray  @dim(Q1D, Q1D, BASIS_COMPONENT_COUNT);
 typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
@@ -44,7 +44,7 @@ inline void readDofs(const int element,
                      const int component,
                      const int px,
                      const int py,
-                     const_batchedDofArray U,
+                     const_dofArray U,
                      CeedScalar *Up) {
   // Zero out extra entries
   for (int pz = 0; pz < P1D; ++pz) {
@@ -64,7 +64,7 @@ inline void writeDofs(const int element,
                       const int px,
                       const int py,
                       const CeedScalar *Vp,
-                      batchedDofArray V) {
+                      dofArray V) {
   if ((px < P1D) && (py < P1D)) {
     for (int pz = 0; pz < P1D; ++pz) {
       V(px, py, pz, component, element) = Vp[pz];
@@ -78,7 +78,7 @@ inline void readQuads(const int elementCount,
                       const int qx,
                       const int qy,
                       const int dim,
-                      const_batchedQuadArray U,
+                      const_quadArray U,
                       CeedScalar *Uq) {
   for (int qz = 0; qz < Q1D; ++qz) {
     Uq[qz] = U(qx, qy, qz, element, component, dim);
@@ -92,7 +92,7 @@ inline void writeQuads(const int elementCount,
                        const int qy,
                        const int dim,
                        const CeedScalar *Vq,
-                       batchedQuadArray V) {
+                       quadArray V) {
   for (int qz = 0; qz < Q1D; ++qz) {
     V(qx, qy, qz, element, component, dim) = Vq[qz];
   }
