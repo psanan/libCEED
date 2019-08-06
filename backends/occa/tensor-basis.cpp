@@ -27,30 +27,55 @@ namespace ceed {
                              const CeedScalar *interp1D_,
                              const CeedScalar *grad1D_,
                              const CeedScalar *qWeight1D_) :
+        usingGPU(false),
         dim(dim_),
         P1D(P1D_),
         Q1D(Q1D_) {
       setCeedFields(basis);
 
       ::occa::device device = getDevice();
+      if (device.hasSeparateMemorySpace()) {
+        usingGPU = true;
+      }
 
       ::occa::dtype_t ceedScalarDtype = ::occa::dtype::get<CeedScalar>();
       interp1D  = device.malloc(P1D, ceedScalarDtype, interp1D_);
       grad1D    = device.malloc(P1D, ceedScalarDtype, grad1D_);
       qWeight1D = device.malloc(Q1D, ceedScalarDtype, qWeight1D_);
 
-      const char *kernelSource = NULL;
-      std::string sharedBufferSize;
-      if (dim == 1) {
-        kernelSource = tensorBasis1D_gpu_source;
-        sharedBufferSize = "(Q1D * ELEMENTS_PER_BLOCK)";
-      } else if (dim == 2) {
-        kernelSource = tensorBasis2D_gpu_source;
-        sharedBufferSize = "(Q1D * Q1D * BASIS_COMPONENT_COUNT * ELEMENTS_PER_BLOCK)";
-      } else {
-        kernelSource = tensorBasis3D_gpu_source;
-        sharedBufferSize = "(Q1D * Q1D * BASIS_COMPONENT_COUNT * ELEMENTS_PER_BLOCK)";
-      }
+      setupKernelBuilders();
+    }
+
+    TensorBasis::~TensorBasis() {
+      interpKernelBuilder.free();
+      gradKernelBuilder.free();
+      weightKernelBuilder.free();
+      interp1D.free();
+      grad1D.free();
+      qWeight1D.free();
+    }
+
+    ::occa::device TensorBasis::getDevice() {
+      return Context::from(ceed)->device;
+    }
+
+    void TensorBasis::setupKernelBuilders() {
+      const char *cpuKernelSources[3] = {
+        tensorBasis1D_cpu_source,
+        tensorBasis2D_cpu_source,
+        tensorBasis3D_cpu_source,
+      };
+      const char *gpuKernelSources[3] = {
+        tensorBasis1D_gpu_source,
+        tensorBasis2D_gpu_source,
+        tensorBasis3D_gpu_source,
+      };
+
+      const char *kernelSource = (
+        usingGPU
+        ? gpuKernelSources[dim]
+        : cpuKernelSources[dim]
+      );
 
       ::occa::properties kernelProps;
       kernelProps["defines/CeedInt"]    = ::occa::dtype::get<CeedInt>().name();
@@ -70,24 +95,15 @@ namespace ceed {
       );
     }
 
-    TensorBasis::~TensorBasis() {
-      interpKernelBuilder.free();
-      gradKernelBuilder.free();
-      weightKernelBuilder.free();
-      interp1D.free();
-      grad1D.free();
-      qWeight1D.free();
-    }
-
-    ::occa::device TensorBasis::getDevice() {
-      return Context::from(ceed)->device;
-    }
-
     int TensorBasis::applyInterp(const CeedInt elementCount,
                                  const bool transpose,
                                  Vector &U,
                                  Vector &V) {
-      ::occa::kernel interp = getInterpKernel();
+      ::occa::kernel interp = (
+        usingGPU
+        ? getGpuInterpKernel()
+        : getCpuInterpKernel()
+      );
       interp(elementCount,
              transpose,
              interp1D,
@@ -96,7 +112,10 @@ namespace ceed {
       return 0;
     }
 
-    ::occa::kernel TensorBasis::getInterpKernel() {
+    ::occa::kernel TensorBasis::getCpuInterpKernel() {
+    }
+
+    ::occa::kernel TensorBasis::getGpuInterpKernel() {
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -115,14 +134,18 @@ namespace ceed {
         sharedBufferSize = Q1D * Q1D * ceedComponentCount * elementsPerBlock;
       }
 
-      return buildEvalKernel(interpKernelBuilder, elementsPerBlock, sharedBufferSize);
+      return buildGpuEvalKernel(interpKernelBuilder, elementsPerBlock, sharedBufferSize);
     }
 
     int TensorBasis::applyGrad(const CeedInt elementCount,
                                const bool transpose,
                                Vector &U,
                                Vector &V) {
-      ::occa::kernel grad = getGradKernel();
+      ::occa::kernel grad = (
+        usingGPU
+        ? getGpuGradKernel()
+        : getCpuGradKernel()
+      );
       grad(elementCount,
            transpose,
            interp1D, grad1D,
@@ -131,7 +154,10 @@ namespace ceed {
       return 0;
     }
 
-    ::occa::kernel TensorBasis::getGradKernel() {
+    ::occa::kernel TensorBasis::getCpuGradKernel() {
+    }
+
+    ::occa::kernel TensorBasis::getGpuGradKernel() {
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -150,17 +176,24 @@ namespace ceed {
         sharedBufferSize = Q1D * Q1D * ceedComponentCount * elementsPerBlock;
       }
 
-      return buildEvalKernel(gradKernelBuilder, elementsPerBlock, sharedBufferSize);
+      return buildGpuEvalKernel(gradKernelBuilder, elementsPerBlock, sharedBufferSize);
     }
 
     int TensorBasis::applyWeight(const CeedInt elementCount,
                                  Vector &W) {
-      ::occa::kernel weight = getWeightKernel();
+      ::occa::kernel weight = (
+        usingGPU
+        ? getGpuWeightKernel()
+        : getCpuWeightKernel()
+      );
       weight(elementCount, qWeight1D, W.getKernelArg());
       return 0;
     }
 
-    ::occa::kernel TensorBasis::getWeightKernel() {
+    ::occa::kernel TensorBasis::getCpuWeightKernel() {
+    }
+
+    ::occa::kernel TensorBasis::getGpuWeightKernel() {
       int elementsPerBlock;
       if (dim == 1) {
         elementsPerBlock = 32 / Q1D;
@@ -174,12 +207,12 @@ namespace ceed {
         elementsPerBlock = Q1D;
       }
 
-      return buildEvalKernel(weightKernelBuilder, elementsPerBlock, 1);
+      return buildGpuEvalKernel(weightKernelBuilder, elementsPerBlock, 1);
     }
 
-    ::occa::kernel TensorBasis::buildEvalKernel(::occa::kernelBuilder &kernelBuilder,
-                                                const int elementsPerBlock,
-                                                const int sharedBufferSize) {
+    ::occa::kernel TensorBasis::buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                                   const int elementsPerBlock,
+                                                   const int sharedBufferSize) {
 
       ::occa::properties kernelProps;
       kernelProps["defines/ELEMENTS_PER_BLOCK"] = elementsPerBlock;

@@ -24,6 +24,7 @@ namespace ceed {
   namespace occa {
     class TensorBasis : public Basis {
      public:
+      bool usingGPU;
       CeedInt dim;
       CeedInt P1D;
       CeedInt Q1D;
@@ -46,28 +47,33 @@ namespace ceed {
 
       ::occa::device getDevice();
 
+      void setupKernelBuilders();
+
       int applyInterp(const CeedInt elementCount,
                       const bool transpose,
                       Vector &U,
                       Vector &V);
 
-      ::occa::kernel getInterpKernel();
+      ::occa::kernel getCpuInterpKernel();
+      ::occa::kernel getGpuInterpKernel();
 
       int applyGrad(const CeedInt elementCount,
                     const bool transpose,
                     Vector &U,
                     Vector &V);
 
-      ::occa::kernel getGradKernel();
+      ::occa::kernel getCpuGradKernel();
+      ::occa::kernel getGpuGradKernel();
 
       int applyWeight(const CeedInt elementCount,
                       Vector &W);
 
-      ::occa::kernel getWeightKernel();
+      ::occa::kernel getCpuWeightKernel();
+      ::occa::kernel getGpuWeightKernel();
 
-      ::occa::kernel buildEvalKernel(::occa::kernelBuilder &kernelBuilder,
-                                     const int elementsPerBlock,
-                                     const int sharedBufferSize);
+      ::occa::kernel buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                        const int elementsPerBlock,
+                                        const int sharedBufferSize);
 
       int apply(const CeedInt elementCount,
                 CeedTransposeMode tmode,

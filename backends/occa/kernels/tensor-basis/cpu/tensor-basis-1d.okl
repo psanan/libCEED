@@ -14,15 +14,13 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#ifndef CEED_OCCA_KERNELS_TENSORBASIS_HEADER
-#define CEED_OCCA_KERNELS_TENSORBASIS_HEADER
+#ifndef CEED_OCCA_KERNELS_TENSORBASIS_CPU_TENSORBASIS1D_HEADER
+#define CEED_OCCA_KERNELS_TENSORBASIS_CPU_TENSORBASIS1D_HEADER
 
-#include "tensor-basis/cpu/tensor-basis-1d.okl"
-#include "tensor-basis/cpu/tensor-basis-2d.okl"
-#include "tensor-basis/cpu/tensor-basis-3d.okl"
+#include "../../kernel-defines.hpp"
 
-#include "tensor-basis/gpu/tensor-basis-1d.okl"
-#include "tensor-basis/gpu/tensor-basis-2d.okl"
-#include "tensor-basis/gpu/tensor-basis-3d.okl"
+
+static const char *tensorBasis1D_cpu_source = STRINGIFY_SOURCE(
+);
 
 #endif
