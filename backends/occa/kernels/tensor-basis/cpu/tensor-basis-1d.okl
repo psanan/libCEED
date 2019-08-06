@@ -22,22 +22,102 @@
 
 static const char *tensorBasis1D_cpu_source = STRINGIFY_SOURCE(
 
+typedef       CeedScalar* dofArray       @dim(P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef const CeedScalar* const_dofArray @dim(P1D, BASIS_COMPONENT_COUNT, elementCount);
+
+typedef       CeedScalar* quadArray       @dim(Q1D, elementCount, BASIS_COMPONENT_COUNT);
+typedef const CeedScalar* const_quadArray @dim(Q1D, elementCount, BASIS_COMPONENT_COUNT);
+
+typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
+typedef const CeedScalar* dofToQuad @dim(Q1D, P1D);
+typedef CeedScalar* elementWeightArray @dim(Q1D, elementCount);
+
+inline void interpElement(const int element,
+                          const int compnent,
+                          @restrict dofToQuad B,
+                          @restrict const_dofArray CeedScalar U,
+                          @restrict quadArray V) {
+  CeedScalar *Ve = &(V(0, element, component));
+
+  for (int q = 0; q < Q1D; ++q) {
+    V[q] = 0;
+  }
+
+  for (int p = 0; p < P1D; ++p) {
+    const CeedScalar Up = U(p, element, component);
+    for (int q = 0; q < Q1D; ++q) {
+      V[q] += B(q, p) * Up;
+    }
+  }
+}
+
+inline void interpElementTranspose(const int element,
+                                   const int compnent,
+                                   @restrict quadToDof B,
+                                   @restrict const_quadArray U,
+                                   @restrict dofArray V) {
+  CeedScalar *Ve = &(V(0, element, component));
+
+  for (int p = 0; p < P1D; ++p) {
+    V[p] = 0;
+  }
+
+  for (int q = 0; q < Q1D; ++q) {
+    const CeedScalar Uq = U(q, element, component);
+    for (int p = 0; p < P1D; ++p) {
+      V[p] += B(p, q) * Uq;
+    }
+  }
+}
+
 @kernel void interp(const CeedInt elementCount,
                     const bool transpose,
-                    @restrict dofToQuadMap B,
+                    @restrict quadToDof B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
-  for (int element = 0; element < elementCount; ++element; @outer) {
+  CeedScalar B_pq[P1D * Q1D] @dim(P1D, Q1D);
+  if (!TRANSPOSE) {
+    for (int q = 0; q < Q1D; ++q) {
+      for (int p = 0; p < P1D; ++p) {
+        B_pq(p, q) = B_qp(q, p);
+      }
+    }
+  }
+
+  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+      if (!TRANSPOSE) {
+        interpElement(element, component, B_pq, U, V);
+      } else {
+        interpElementTranspose(element, component, B_qp, U, V);
+      }
+    }
   }
 }
 
 @kernel void grad(const CeedInt elementCount,
                   const bool transpose,
-                  @restrict dofToQuadMap B,
-                  @restrict dofToQuadMap Bx,
+                  @restrict quadToDof B_qp,
+                  @restrict quadToDof Bx_qp,
                   @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
-  for (int element = 0; element < elementCount; ++element; @outer) {
+  CeedScalar Bx_pq[P1D * Q1D] @dim(P1D, Q1D);
+  if (!TRANSPOSE) {
+    for (int q = 0; q < Q1D; ++q) {
+      for (int p = 0; p < P1D; ++p) {
+        Bx_pq(p, q) = Bx_qp(q, p);
+      }
+    }
+  }
+
+  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+      if (!TRANSPOSE) {
+        interpElement(element, component, Bx_pq, U, V);
+      } else {
+        interpElementTranspose(element, component, Bx_qp, U, V);
+      }
+    }
   }
 }
 

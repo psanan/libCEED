@@ -22,22 +22,253 @@
 
 static const char *tensorBasis2D_cpu_source = STRINGIFY_SOURCE(
 
+typedef       CeedScalar* dofArray       @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+typedef const CeedScalar* const_dofArray @dim(P1D, P1D, BASIS_COMPONENT_COUNT, elementCount);
+
+typedef       CeedScalar* quadArray       @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
+typedef const CeedScalar* const_quadArray @dim(Q1D, Q1D, elementCount, BASIS_COMPONENT_COUNT, 2);
+
+typedef const CeedScalar* quadToDof @dim(P1D, Q1D);
+typedef const CeedScalar* dofToQuad @dim(Q1D, P1D);
+typedef CeedScalar* elementWeightArray @dim(Q1D, Q1D, elementCount);
+
+inline void interpElement(const int element,
+                          const int component,
+                          @restrict quadToDof B,
+                          @restrict const_dofArray U,
+                          @restrict quadArray V) {
+  @restrict const CeedScalar *Ue @dim(P1D, P1D) = (
+    &(U(0, 0, component, element))
+  );
+  @restrict CeedScalar *Ve @dim(Q1D, Q1D) = (
+    &(V(0, 0, element, component))
+  );
+
+  for (int qy = 0; qy < Q1D; ++qy) {
+    for (int qx = 0; qx < Q1D; ++qx) {
+      Ve(qx, qy) = 0;
+    }
+  }
+
+  for (int py = 0; py < P1D; ++py) {
+    CeedScalar V_x[Q1D];
+    for (int qy = 0; qy < Q1D; ++qy) {
+      V_x[qy] = 0;
+    }
+
+    for (int px = 0; px < P1D; ++px) {
+      const CeedScalar Up = Ue(px, py);
+      for (int qx = 0; qx < Q1D; ++qx) {
+        V_x[qx] += B(px, qx) * Up;
+      }
+    }
+
+    for (int qy = 0; qy < Q1D; ++qy) {
+      const CeedScalar w = B(py, qy);
+      for (int qx = 0; qx < Q1D; ++qx) {
+        Ve(qx, qy) += w * V_x[qx];
+      }
+    }
+  }
+}
+
+inline void interpElementTranspose(const int element,
+                                   const int component,
+                                   @restrict dofToQuad B,
+                                   @restrict const_quadArray U,
+                                   @restrict dofArray V) {
+  @restrict const CeedScalar *Ue @dim(Q1D, Q1D) = (
+    &(U(0, 0, element, component))
+  );
+  @restrict CeedScalar *Ve @dim(P1D, P1D) = (
+    &(V(0, 0, element, component))
+  );
+
+  for (int py = 0; py < P1D; ++py) {
+    for (int px = 0; px < P1D; ++px) {
+      Ve(px, py) = 0;
+    }
+  }
+
+  for (int qy = 0; qy < Q1D; ++qy) {
+    CeedScalar V_x[P1D];
+    for (int py = 0; py < P1D; ++py) {
+      V_x[py] = 0;
+    }
+
+    for (int qx = 0; qx < Q1D; ++qx) {
+      const CeedScalar Up = Ue(qx, qy);
+      for (int px = 0; px < P1D; ++px) {
+        V_x[px] += B(qx, px) * Up;
+      }
+    }
+
+    for (int py = 0; py < P1D; ++py) {
+      const CeedScalar w = B(qy, py);
+      for (int px = 0; px < P1D; ++px) {
+        Ve(px, py) += w * V_x[px];
+      }
+    }
+  }
+}
+
+inline void gradElement(const int element,
+                        const int component,
+                        @restrict dofToQuad B,
+                        @restrict dofToQuad Bx,
+                        @restrict const_dofArray U,
+                        @restrict quadArray V) {
+  @restrict const CeedScalar *Ue @dim(P1D, P1D) = (
+    &(U(0, 0, component, element))
+  );
+  @restrict CeedScalar *Ve_x @dim(Q1D, Q1D) = (
+    &(V(0, 0, element, component, 0))
+  );
+  @restrict CeedScalar *Ve_y @dim(Q1D, Q1D) = (
+    &(V(0, 0, element, component, 1))
+  );
+
+  CeedScalar grad[Q1D][Q1D][2];
+  for (int qy = 0; qy < Q1D; ++qy) {
+    for (int qx = 0; qx < Q1D; ++qx) {
+      grad[qy][qx][0] = 0;
+      grad[qy][qx][1] = 0;
+    }
+  }
+
+  for (int py = 0; py < P1D; ++py) {
+    CeedScalar gradX[Q1D][2];
+    for (int qx = 0; qx < Q1D; ++qx) {
+      gradX[qx][0] = 0;
+      gradX[qx][1] = 0;
+    }
+
+    for (int px = 0; px < P1D; ++px) {
+      const CeedScalar Up = Ue(px, py);
+      for (int qx = 0; qx < Q1D; ++qx) {
+        gradX[qx][0] += Up * B(qx, px);
+        gradX[qx][1] += Up * Bx(qx, px);
+      }
+    }
+
+    for (int qy = 0; qy < Q1D; ++qy) {
+      const CeedScalar wx  = B(qy, py);
+      const CeedScalar wDx = Bx(qy, py);
+      for (int qx = 0; qx < Q1D; ++qx) {
+        grad[qy][qx][0] += gradX[qx][1] * wx;
+        grad[qy][qx][1] += gradX[qx][0] * wDx;
+      }
+    }
+  }
+  for (int qy = 0; qy < Q1D; ++qy) {
+    for (int qx = 0; qx < Q1D; ++qx) {
+      Ve_x(qx, qy) = grad[qy][qx][0];
+      Ve_y(qx, qy) = grad[qy][qx][1];
+    }
+  }
+}
+
+inline void gradElementTranspose(const int element,
+                                 const int component,
+                                 @restrict quadToDof B,
+                                 @restrict quadToDof Bx,
+                                 @restrict const_quadArray U,
+                                 @restrict dofArray V) {
+  @restrict const CeedScalar *Ue_x @dim(Q1D, Q1D) = (
+    &(U(0, 0, element, component, 0))
+  );
+  @restrict const CeedScalar *Ue_y @dim(Q1D, Q1D) = (
+    &(U(0, 0, element, component, 1))
+  );
+  @restrict CeedScalar *Ve @dim(P1D, P1D) = (
+    &(V(0, 0, component, element))
+  );
+
+  for (int py = 0; py < P1D; ++py) {
+    for (int px = 0; px < P1D; ++px) {
+      Ve(px, py) = 0.0;
+    }
+  }
+
+  for (int qy = 0; qy < Q1D; ++qy) {
+    CeedScalar gradX[P1D][2];
+    for (int px = 0; px < P1D; ++px) {
+      gradX[px][0] = 0;
+      gradX[px][1] = 0;
+    }
+
+    for (int qx = 0; qx < Q1D; ++qx) {
+      const CeedScalar Ux = Ue_x(qy, qx);
+      const CeedScalar Uy = Ue_y(qy, qx);
+      for (int px = 0; px < P1D; ++px) {
+        const CeedScalar wx  = B(px, qx);
+        const CeedScalar wDx = Bx(px, qx);
+        gradX[px][0] += Ux * wx;
+        gradX[px][1] += Uy * wDx;
+      }
+    }
+
+    for (int py = 0; py < P1D; ++py) {
+      const CeedScalar wy  = B(py, qy);
+      const CeedScalar wDy = Bx(py, qy);
+      for (int px = 0; px < P1D; ++px) {
+        Ve(px, py) += ((gradX[px][0] * wy) +
+                       (gradX[px][1] * wDy));
+      }
+    }
+  }
+}
+
 @kernel void interp(const CeedInt elementCount,
                     const bool transpose,
-                    @restrict dofToQuadMap B,
+                    @restrict dofToQuadMap B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
-  for (int element = 0; element < elementCount; ++element; @outer) {
+  CeedScalar B_pq[P1D * Q1D] @dim(P1D, Q1D);
+  if (TRANSPOSE) {
+    for (int q = 0; q < Q1D; ++q) {
+      for (int p = 0; p < P1D; ++p) {
+        B_pq(p, q) = B_qp(q, p);
+      }
+    }
+  }
+
+  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+      if (!TRANSPOSE) {
+        interpElement(element, component, B_pq, U, V);
+      } else {
+        interpElementTranspose(element, component, B_qp, U, V);
+      }
+    }
   }
 }
 
 @kernel void grad(const CeedInt elementCount,
                   const bool transpose,
-                  @restrict dofToQuadMap B,
-                  @restrict dofToQuadMap Bx,
+                  @restrict quadToDof B_qp,
+                  @restrict quadToDof Bx_qp,
                   @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
-  for (int element = 0; element < elementCount; ++element; @outer) {
+  CeedScalar B_pq[P1D * Q1D]  @dim(P1D, Q1D);
+  CeedScalar Bx_pq[P1D * Q1D] @dim(P1D, Q1D);
+  if (TRANSPOSE) {
+    for (int q = 0; q < Q1D; ++q) {
+      for (int p = 0; p < P1D; ++p) {
+        B_pq(q, p)  = B_qp(p, q);
+        Bx_pq(q, p) = Bx_qp(p, q);
+      }
+    }
+  }
+
+  for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
+    for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
+      if (!TRANSPOSE) {
+        gradElement(element, component, B_pq, Bx_pq, U, V);
+      } else {
+        gradElementTranspose(element, component, B_pq, Bx_pq, U, V);
+      }
+    }
   }
 }
 
@@ -46,8 +277,9 @@ static const char *tensorBasis2D_cpu_source = STRINGIFY_SOURCE(
                     @restrict elementWeightArray W) {
   for (int element = 0; element < elementCount; ++element; @outer) {
     for (int qy = 0; qy < Q1D; ++qy; @inner) {
+      const CeedScalar wy = qWeights1D[qy];
       for (int qx = 0; qx < Q1D; ++qx; @inner) {
-        W(qx, qy, element) = qWeights1D[qx] * qWeights1D[qy];
+        W(qx, qy, element) = qWeights1D[qx] * wy;
       }
     }
   }
