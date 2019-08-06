@@ -147,7 +147,6 @@ inline void contractTransposeY(const int px,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    const bool transpose,
                     @restrict dofToQuadMap B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -163,7 +162,7 @@ inline void contractTransposeY(const int px,
           if (element < elementCount) {
             for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
               CeedScalar r1, r2;
-              if (!transpose) {
+              if (!TRANSPOSE) {
                 readDofs(element, component, qx, qy, U, r1);
                 contractX(qx, qy, localElement, sharedBuffer, B, r1, r2);
                 contractY(qx, qy, localElement, sharedBuffer, B, r2, r1);
@@ -184,7 +183,6 @@ inline void contractTransposeY(const int px,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const bool transpose,
                   @restrict dofToQuadMap B,
                   @restrict dofToQuadMap Bx,
                   @restrict const CeedScalar *U,
@@ -201,7 +199,7 @@ inline void contractTransposeY(const int px,
           if (element < elementCount) {
             for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
               CeedScalar r1, r2, r3;
-              if (!transpose) {
+              if (!TRANSPOSE) {
                 readDofs(element, component, qx, qy, U, r1);
                 contractX(qx, qy, localElement, sharedBuffer, Bx, r1, r2);
                 contractY(qx, qy, localElement, sharedBuffer, B , r2, r3);

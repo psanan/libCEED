@@ -17,6 +17,21 @@
 #include "tensor-basis.hpp"
 #include "kernels/tensor-basis.hpp"
 
+// CPU kernels are based on the work found in the ref backend
+
+// GPU kernels are based on the work found in the cuda-shared backend
+//
+// Expects the following types to be defined:
+// - CeedInt
+// - CeedScalar
+//
+// Expects the following constants to be defined:
+// - Q1D                  : CeedInt
+// - P1D                  : CeedInt
+// - BASIS_COMPONENT_COUNT: CeedInt
+// - ELEMENTS_PER_BLOCK   : CeedInt
+// - SHARED_BUFFER_SIZE   : CeedInt
+// - TRANSPOSE            : bool
 
 namespace ceed {
   namespace occa {
@@ -101,8 +116,8 @@ namespace ceed {
                                  Vector &V) {
       ::occa::kernel interp = (
         usingGPU
-        ? getGpuInterpKernel()
-        : getCpuInterpKernel()
+        ? getGpuInterpKernel(transpose)
+        : getCpuInterpKernel(transpose)
       );
       interp(elementCount,
              transpose,
@@ -112,10 +127,10 @@ namespace ceed {
       return 0;
     }
 
-    ::occa::kernel TensorBasis::getCpuInterpKernel() {
+    ::occa::kernel TensorBasis::getCpuInterpKernel(const bool transpose) {
     }
 
-    ::occa::kernel TensorBasis::getGpuInterpKernel() {
+    ::occa::kernel TensorBasis::getGpuInterpKernel(const bool transpose) {
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -134,7 +149,10 @@ namespace ceed {
         sharedBufferSize = Q1D * Q1D * ceedComponentCount * elementsPerBlock;
       }
 
-      return buildGpuEvalKernel(interpKernelBuilder, elementsPerBlock, sharedBufferSize);
+      return buildGpuEvalKernel(interpKernelBuilder,
+                                transpose,
+                                elementsPerBlock,
+                                sharedBufferSize);
     }
 
     int TensorBasis::applyGrad(const CeedInt elementCount,
@@ -143,8 +161,8 @@ namespace ceed {
                                Vector &V) {
       ::occa::kernel grad = (
         usingGPU
-        ? getGpuGradKernel()
-        : getCpuGradKernel()
+        ? getGpuGradKernel(transpose)
+        : getCpuGradKernel(transpose)
       );
       grad(elementCount,
            transpose,
@@ -154,10 +172,10 @@ namespace ceed {
       return 0;
     }
 
-    ::occa::kernel TensorBasis::getCpuGradKernel() {
+    ::occa::kernel TensorBasis::getCpuGradKernel(const bool transpose) {
     }
 
-    ::occa::kernel TensorBasis::getGpuGradKernel() {
+    ::occa::kernel TensorBasis::getGpuGradKernel(const bool transpose) {
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -176,7 +194,10 @@ namespace ceed {
         sharedBufferSize = Q1D * Q1D * ceedComponentCount * elementsPerBlock;
       }
 
-      return buildGpuEvalKernel(gradKernelBuilder, elementsPerBlock, sharedBufferSize);
+      return buildGpuEvalKernel(gradKernelBuilder,
+                                transpose,
+                                elementsPerBlock,
+                                sharedBufferSize);
     }
 
     int TensorBasis::applyWeight(const CeedInt elementCount,
@@ -207,14 +228,19 @@ namespace ceed {
         elementsPerBlock = Q1D;
       }
 
-      return buildGpuEvalKernel(weightKernelBuilder, elementsPerBlock, 1);
+      return buildGpuEvalKernel(weightKernelBuilder,
+                                false,
+                                elementsPerBlock,
+                                1);
     }
 
     ::occa::kernel TensorBasis::buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                                   const bool transpose,
                                                    const int elementsPerBlock,
                                                    const int sharedBufferSize) {
 
       ::occa::properties kernelProps;
+      kernelProps["defines/TRANSPOSE"]          = transpose;
       kernelProps["defines/ELEMENTS_PER_BLOCK"] = elementsPerBlock;
       kernelProps["defines/SHARED_BUFFER_SIZE"] = sharedBufferSize;
 
@@ -226,8 +252,6 @@ namespace ceed {
                            CeedEvalMode emode,
                            Vector *U,
                            Vector *V) {
-      const bool transpose = tmode == CEED_TRANSPOSE;
-
       if ((dim < 1) || (3 < dim)) {
         return CeedError(
           NULL, 1,
@@ -257,6 +281,7 @@ namespace ceed {
 
       try {
         // Apply kernel
+        const bool transpose = tmode == CEED_TRANSPOSE;
         switch (emode) {
           case CEED_EVAL_INTERP:
             return applyInterp(elementCount, transpose, *U, *V);

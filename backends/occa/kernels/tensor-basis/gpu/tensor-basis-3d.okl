@@ -204,7 +204,6 @@ inline void contractTransposeZ(const int px,
 
 //---[ Kernels ]------------------------
 @kernel void interp(const CeedInt elementCount,
-                    const bool transpose,
                     @restrict dofToQuadMap B,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -223,7 +222,7 @@ inline void contractTransposeZ(const int px,
               r2[q] = 0.0;
             }
 
-            if (!transpose) {
+            if (!TRANSPOSE) {
               readDofs(element, component, qx, qy, U, r1);
               contractX(qx, qy, component, sharedBuffer, B, r1, r2);
               contractY(qx, qy, component, sharedBuffer, B, r2, r1);
@@ -245,7 +244,6 @@ inline void contractTransposeZ(const int px,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const bool transpose,
                   @restrict dofToQuadMap B,
                   @restrict dofToQuadMap Bx,
                   @restrict const CeedScalar *U,
@@ -261,7 +259,7 @@ inline void contractTransposeZ(const int px,
           if (element < elementCount) {
             CeedScalar r1[Q1D], r2[Q1D], r3[Q1D];
 
-            if (!transpose) {
+            if (!TRANSPOSE) {
               readDofs(element, component, qx, qy, U, r1);
               // Dx
               contractX(qx, qy, component, sharedBuffer, Bx, r1, r2);

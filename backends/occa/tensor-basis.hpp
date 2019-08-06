@@ -54,16 +54,16 @@ namespace ceed {
                       Vector &U,
                       Vector &V);
 
-      ::occa::kernel getCpuInterpKernel();
-      ::occa::kernel getGpuInterpKernel();
+      ::occa::kernel getCpuInterpKernel(const bool transpose);
+      ::occa::kernel getGpuInterpKernel(const bool transpose);
 
       int applyGrad(const CeedInt elementCount,
                     const bool transpose,
                     Vector &U,
                     Vector &V);
 
-      ::occa::kernel getCpuGradKernel();
-      ::occa::kernel getGpuGradKernel();
+      ::occa::kernel getCpuGradKernel(const bool transpose);
+      ::occa::kernel getGpuGradKernel(const bool transpose);
 
       int applyWeight(const CeedInt elementCount,
                       Vector &W);
@@ -72,6 +72,7 @@ namespace ceed {
       ::occa::kernel getGpuWeightKernel();
 
       ::occa::kernel buildGpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
+                                        const bool transpose,
                                         const int elementsPerBlock,
                                         const int sharedBufferSize);
 

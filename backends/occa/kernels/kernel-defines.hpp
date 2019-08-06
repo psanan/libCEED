@@ -14,21 +14,8 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#ifndef CEED_OCCA_KERNELS_HEADER_HEADER
-#define CEED_OCCA_KERNELS_HEADER_HEADER
-
-// Based on cuda-shared kernels
-//
-// Expects the following types:
-// - CeedInt
-// - CeedScalar
-//
-// Expects the following definitions:
-// - Q1D                  : CeedInt
-// - P1D                  : CeedInt
-// - ELEMENTS_PER_BLOCK   : CeedInt
-// - BASIS_COMPONENT_COUNT: CeedInt
-// - SHARED_BUFFER_SIZE   : CeedInt
+#ifndef CEED_OCCA_KERNELS_KERNELDEFINES_HEADER
+#define CEED_OCCA_KERNELS_KERNELDEFINES_HEADER
 
 #define STRINGIFY_SOURCE(...) #__VA_ARGS__
 

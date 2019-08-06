@@ -21,6 +21,38 @@
 
 
 static const char *tensorBasis2D_cpu_source = STRINGIFY_SOURCE(
+
+@kernel void interp(const CeedInt elementCount,
+                    const bool transpose,
+                    @restrict dofToQuadMap B,
+                    @restrict const CeedScalar *U,
+                    @restrict CeedScalar *V) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+  }
+}
+
+@kernel void grad(const CeedInt elementCount,
+                  const bool transpose,
+                  @restrict dofToQuadMap B,
+                  @restrict dofToQuadMap Bx,
+                  @restrict const CeedScalar *U,
+                  @restrict CeedScalar *V) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+  }
+}
+
+@kernel void weight(const CeedInt elementCount,
+                    @restrict const CeedScalar *qWeights1D,
+                    @restrict elementWeightArray W) {
+  for (int element = 0; element < elementCount; ++element; @outer) {
+    for (int qy = 0; qy < Q1D; ++qy; @inner) {
+      for (int qx = 0; qx < Q1D; ++qx; @inner) {
+        W(qx, qy, element) = qWeights1D[qx] * qWeights1D[qy];
+      }
+    }
+  }
+}
+
 );
 
 #endif
