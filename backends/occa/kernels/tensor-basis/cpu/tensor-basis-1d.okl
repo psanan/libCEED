@@ -73,7 +73,6 @@ inline void interpElementTranspose(const int elementCount,
 }
 
 @kernel void interp(const CeedInt elementCount,
-                    const bool transpose,
                     @restrict quadToDof B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -98,7 +97,6 @@ inline void interpElementTranspose(const int elementCount,
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const bool transpose,
                   @restrict quadToDof B_qp,
                   @restrict quadToDof Bx_qp,
                   @restrict const CeedScalar *U,

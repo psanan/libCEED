@@ -224,7 +224,6 @@ inline void gradElementTranspose(const int elementCount,
 }
 
 @kernel void interp(const CeedInt elementCount,
-                    const bool transpose,
                     @restrict quadToDof B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
@@ -240,16 +239,15 @@ inline void gradElementTranspose(const int elementCount,
   for (int element = 0; element < elementCount; ++element; @tile(16, @outer, @inner)) {
     for (int component = 0; component < BASIS_COMPONENT_COUNT; ++component) {
       if (!TRANSPOSE) {
-        interpElement(elementCount, element, component, B_qp, U, V);
+        interpElement(elementCount, element, component, B_pq, U, V);
       } else {
-        interpElementTranspose(elementCount, element, component, B_pq, U, V);
+        interpElementTranspose(elementCount, element, component, B_qp, U, V);
       }
     }
   }
 }
 
 @kernel void grad(const CeedInt elementCount,
-                  const bool transpose,
                   @restrict quadToDof B_qp,
                   @restrict quadToDof Bx_qp,
                   @restrict const CeedScalar *U,

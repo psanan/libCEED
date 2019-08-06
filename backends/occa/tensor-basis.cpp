@@ -121,7 +121,6 @@ namespace ceed {
       );
 
       interp(elementCount,
-             transpose,
              interp1D,
              U.getConstKernelArg(),
              V.getKernelArg());
@@ -170,7 +169,6 @@ namespace ceed {
       );
 
       grad(elementCount,
-           transpose,
            interp1D, grad1D,
            U.getConstKernelArg(),
            V.getKernelArg());
