@@ -42,14 +42,11 @@ inline void interpElement(const int elementCount,
   @restrict CeedScalar *Ve = &(V(0, element, component));
 
   for (int q = 0; q < Q1D; ++q) {
-    Ve[q] = 0;
-  }
-
-  for (int p = 0; p < P1D; ++p) {
-    const CeedScalar Up = Ue[p];
-    for (int q = 0; q < Q1D; ++q) {
-      Ve[q] += B(q, p) * Up;
+    CeedScalar Vq = 0;
+    for (int p = 0; p < P1D; ++p) {
+      Vq += B(q, p) * U[p];
     }
+    Ve[q] = Vq;
   }
 }
 
@@ -63,14 +60,11 @@ inline void interpElementTranspose(const int elementCount,
   @restrict CeedScalar *Ve = &(V(0, component, element));
 
   for (int p = 0; p < P1D; ++p) {
-    Ve[p] = 0;
-  }
-
-  for (int q = 0; q < Q1D; ++q) {
-    const CeedScalar Uq = Ue[q];
-    for (int p = 0; p < P1D; ++p) {
-      Ve[p] += B(p, q) * Uq;
+    CeedScalar Vp = 0;
+    for (int q = 0; q < Q1D; ++q) {
+      Vp += B(p, q) * U[q];
     }
+    Ve[p] = Vp;
   }
 }
 
@@ -78,11 +72,11 @@ inline void interpElementTranspose(const int elementCount,
                     @restrict quadToDof B_qp,
                     @restrict const CeedScalar *U,
                     @restrict CeedScalar *V) {
-  CeedScalar B_pq[P1D * Q1D] @dim(P1D, Q1D);
+  CeedScalar B_pq[Q1D * P1D] @dim(Q1D, P1D);
   if (!TRANSPOSE) {
-    for (int q = 0; q < Q1D; ++q) {
-      for (int p = 0; p < P1D; ++p) {
-        B_pq(p, q) = B_qp(q, p);
+    for (int p = 0; p < P1D; ++p) {
+      for (int q = 0; q < Q1D; ++q) {
+        B_pq(q, p) = B_qp(p, q);
       }
     }
   }
@@ -103,11 +97,11 @@ inline void interpElementTranspose(const int elementCount,
                   @restrict quadToDof Bx_qp,
                   @restrict const CeedScalar *U,
                   @restrict CeedScalar *V) {
-  CeedScalar Bx_pq[P1D * Q1D] @dim(P1D, Q1D);
+  CeedScalar Bx_pq[Q1D * P1D] @dim(Q1D, P1D);
   if (!TRANSPOSE) {
-    for (int q = 0; q < Q1D; ++q) {
-      for (int p = 0; p < P1D; ++p) {
-        Bx_pq(p, q) = Bx_qp(q, p);
+    for (int p = 0; p < P1D; ++p) {
+      for (int q = 0; q < Q1D; ++q) {
+        Bx_pq(q, p) = Bx_qp(p, q);
       }
     }
   }

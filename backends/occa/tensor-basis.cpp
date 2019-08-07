@@ -246,7 +246,6 @@ namespace ceed {
 
     ::occa::kernel TensorBasis::buildCpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
                                                    const bool transpose) {
-
       ::occa::properties kernelProps;
       kernelProps["defines/TRANSPOSE"] = transpose;
 
