@@ -62,6 +62,8 @@ namespace ceed {
 
       void freeHostBuffer();
 
+      int setValue(CeedScalar value);
+
       int setArray(CeedMemType mtype,
                    CeedCopyMode cmode, CeedScalar *array);
 
@@ -90,6 +92,8 @@ namespace ceed {
                                         const char *fname, ceed::occa::ceedFunction f);
 
       static int ceedCreate(CeedInt length, CeedVector vec);
+
+      static int ceedSetValue(CeedVector vec, CeedScalar value);
 
       static int ceedSetArray(CeedVector vec, CeedMemType mtype,
                               CeedCopyMode cmode, CeedScalar *array);
