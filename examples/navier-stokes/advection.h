@@ -79,8 +79,10 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     const CeedScalar z = X[i+2*Q];
     // -- Energy
     const CeedScalar r = sqrt(pow((x - x0[0]), 2) +
-                              pow((y - x0[1]), 2));// +
+                              pow((y - x0[1]), 2) +
 //                              pow((z - x0[2]), 2));
+                              0);
+// line above uncommented make a half cylinder  flip comment with 2 lines above to get  half sphere
 
     // Initial Conditions
     q0[i+0*Q] = 1.;
@@ -89,6 +91,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     q0[i+3*Q] = 0.0;
 //    q0[i+4*Q] = r <= rc ? (1.-r/rc) : 0.;
     q0[i+4*Q] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
+// line above adds a conditional to cut the shape in half. 2 lines above is original smooth, full round
 
     // Homogeneous Dirichlet Boundary Conditions for Momentum
     if(0) {
