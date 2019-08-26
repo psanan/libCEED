@@ -79,17 +79,19 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     const CeedScalar z = X[i+2*Q];
     // -- Energy
     const CeedScalar r = sqrt(pow((x - x0[0]), 2) +
-                              pow((y - x0[1]), 2) +
-                              pow((z - x0[2]), 2));
+                              pow((y - x0[1]), 2));// +
+//                              pow((z - x0[2]), 2));
 
     // Initial Conditions
     q0[i+0*Q] = 1.;
-    q0[i+1*Q] = -0.5*(y - center[1]);
-    q0[i+2*Q] =  0.5*(x - center[0]);
+    q0[i+1*Q] = -0.5e2*(y - center[1]);
+    q0[i+2*Q] =  0.5e2*(x - center[0]);
     q0[i+3*Q] = 0.0;
-    q0[i+4*Q] = r <= rc ? (1.-r/rc) : 0.;
+//    q0[i+4*Q] = r <= rc ? (1.-r/rc) : 0.;
+    q0[i+4*Q] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
 
     // Homogeneous Dirichlet Boundary Conditions for Momentum
+    if(0) {
     if ( fabs(x - 0.0) < tol || fabs(x - lx) < tol
          || fabs(y - 0.0) < tol || fabs(y - ly) < tol
          || fabs(z - 0.0) < tol || fabs(z - lz) < tol ) {
@@ -97,6 +99,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
       q0[i+2*Q] = 0.0;
       q0[i+3*Q] = 0.0;
     }
+}
 
     // Coordinates
     coords[i+0*Q] = x;
@@ -129,6 +132,9 @@ static int Advection(void *ctx, CeedInt Q,
   const CeedScalar *q = in[0], *dq = in[1], *qdata = in[2], *x = in[3];
   // Outputs
   CeedScalar *v = out[0], *dv = out[1];
+  // Context
+  const CeedScalar *context = (const CeedScalar*)ctx;
+  const CeedScalar CtauS      = context[0];
 
   CeedPragmaOMP(simd)
   // Quadrature Point Loop
@@ -203,9 +209,38 @@ static int Advection(void *ctx, CeedInt Q,
       dv[i+(4+5*0)*Q]  = E*(u[0]*wBJ[0] + u[1]*wBJ[1] + u[2]*wBJ[2]);
       dv[i+(4+5*1)*Q]  = E*(u[0]*wBJ[3] + u[1]*wBJ[4] + u[2]*wBJ[5]);
       dv[i+(4+5*2)*Q]  = E*(u[0]*wBJ[6] + u[1]*wBJ[7] + u[2]*wBJ[8]);
+//    if( 0) {
+    if(CtauS > 0) {
+//stab
+    // -- Grad-to-Grad qdata
+    const CeedScalar wBBJ[6]  =  { qdata[i+10*Q],
+                                   qdata[i+11*Q],
+                                   qdata[i+12*Q],
+                                   qdata[i+13*Q],
+                                   qdata[i+14*Q],
+                                   qdata[i+15*Q]
+                                 };
+
+      v[i+4*Q]  = -((u[0]*dE[0]+E*du[0])*wBBJ[0] + (u[0]*dE[1]+E*du[3])*wBBJ[1]
+                +   (u[0]*dE[2]+E*du[6])*wBBJ[2]);
+      v[i+4*Q] -=   (u[1]*dE[0]+E*du[1])*wBBJ[1] + (u[1]*dE[1]+E*du[4])*wBBJ[3]
+                +   (u[1]*dE[2]+E*du[7])*wBBJ[4];
+      v[i+4*Q] -=   (u[2]*dE[0]+E*du[2])*wBBJ[2] + (u[2]*dE[1]+E*du[5])*wBBJ[4]
+                +   (u[2]*dE[2]+E*du[8])*wBBJ[5];
+      const CeedScalar wJ       =    qdata[i+ 0*Q];
+      const CeedScalar uiujgij = ( wBBJ[0]*u[0]*u[0] + wBBJ[3]*u[1]*u[1] + wBBJ[5]*u[2]*u[2]
+                               + 2*wBBJ[1]*u[0]*u[1] + 2*wBBJ[2]*u[0]*u[2] + 2*wBBJ[4]*u[1]*u[2])/wJ;
+    const CeedScalar f1   = sqrt(uiujgij); 
+    const CeedScalar TauS = CtauS/f1;
+      v[i+4*Q] *=TauS;
+      dv[i+(4+5*0)*Q]  += u[0]*v[i+4*Q];
+      dv[i+(4+5*1)*Q]  += u[1]*v[i+4*Q];
+      dv[i+(4+5*2)*Q]  += u[2]*v[i+4*Q];
+// end stab (need next line either way)
+      }
       v[i+4*Q] = 0;
     }
-    // ---- Version 2: v E du
+    // ---- Version 2: v E du (this does not look right to me (KEJ).
     if (0) {
       dv[i+(4+0*5)*Q] = 0;
       dv[i+(4+1*5)*Q] = 0;
@@ -213,6 +248,19 @@ static int Advection(void *ctx, CeedInt Q,
       v[i+4*Q]   = E*(du[0]*wBJ[0] + du[3]*wBJ[1] + du[6]*wBJ[2]);
       v[i+4*Q]  -= E*(du[1]*wBJ[3] + du[4]*wBJ[4] + du[7]*wBJ[5]);
       v[i+4*Q]  -= E*(du[2]*wBJ[6] + du[5]*wBJ[7] + du[8]*wBJ[8]);
+    }
+
+    // ---- Version 3: v d(u E)
+    if (0) {
+      dv[i+(4+0*5)*Q] = 0;
+      dv[i+(4+1*5)*Q] = 0;
+      dv[i+(4+2*5)*Q] = 0;
+      v[i+4*Q]   = -((u[0]*dE[0]+E*du[0])*wBJ[0] + (u[0]*dE[1]+E*du[3])*wBJ[1]
+                 + (u[0]*dE[2]+E*du[6])*wBJ[2]);
+      v[i+4*Q]  -= (u[1]*dE[0]+E*du[1])*wBJ[3] + (u[1]*dE[1]+E*du[4])*wBJ[4]
+                 + (u[1]*dE[2]+E*du[7])*wBJ[5];
+      v[i+4*Q]  -= (u[2]*dE[0]+E*du[2])*wBJ[6] + (u[2]*dE[1]+E*du[5])*wBJ[7]
+                 + (u[2]*dE[2]+E*du[8])*wBJ[8];
     }
 
   } // End Quadrature Point Loop
