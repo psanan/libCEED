@@ -47,14 +47,16 @@ static void Split3(PetscInt size, PetscInt m[3], bool reverse) {
 
 // Utility function, compute the number of DoFs from the global grid
 static void GlobalDof(const PetscInt p[3], const PetscInt irank[3],
+                      const PetscBool periodic[3],
                       PetscInt degree, const PetscInt melem[3],
                       PetscInt mdof[3]) {
   for (int d=0; d<3; d++)
-    mdof[d] = degree*melem[d] + (irank[d] == p[d]-1);
+    mdof[d] = degree*melem[d] + (!periodic[d] && irank[d] == p[d]-1);
 }
 
 // Utility function
 static PetscInt GlobalStart(const PetscInt p[3], const PetscInt irank[3],
+                            const PetscBool periodic[3],
                             PetscInt degree, const PetscInt melem[3]) {
   PetscInt start = 0;
   // Dumb brute-force is easier to read
@@ -63,7 +65,7 @@ static PetscInt GlobalStart(const PetscInt p[3], const PetscInt irank[3],
       for (PetscInt k=0; k<p[2]; k++) {
         PetscInt mdof[3], ijkrank[] = {i,j,k};
         if (i == irank[0] && j == irank[1] && k == irank[2]) return start;
-        GlobalDof(p, ijkrank, degree, melem, mdof);
+        GlobalDof(p, ijkrank, periodic, degree, melem, mdof);
         start += mdof[0] * mdof[1] * mdof[2];
       }
     }
@@ -196,48 +198,65 @@ static PetscErrorCode RHS_NS(TS ts, PetscReal t, Vec Q, Vec G, void *userData) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode MapLocalToDMGlobal(User user, Vec Xloc, Vec Xdm, const PetscReal scale[]) {
+  PetscErrorCode ierr;
+  DM dm;
+  DMDALocalInfo info;
+  PetscScalar ***xdm;
+  const PetscScalar *xloc;
+  PetscInt bs, lnodes[3];
+
+  PetscFunctionBeginUser;
+  ierr = VecGetDM(Xdm, &dm);CHKERRQ(ierr);
+  for (PetscInt d=0; d<3; d++) lnodes[d] = user->melem[d]*user->degree + 1;
+  ierr = VecGetBlockSize(Xloc, &bs);CHKERRQ(ierr);
+  ierr = DMDAGetLocalInfo(dm, &info); CHKERRQ(ierr);
+  ierr = VecGetArrayRead(Xloc, &xloc); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(dm, Xdm, &xdm); CHKERRQ(ierr);
+  for (PetscInt i=0; i<info.zm; i++) {
+    for (PetscInt j=0; j<info.ym; j++) {
+      for (PetscInt k=0; k<info.xm; k++) {
+        for (PetscInt c=0; c<bs; c++) {
+          // scale back each component of vector
+          xdm[info.zs+i][info.ys+j][(info.xs+k)*bs + c] =
+            xloc[((i*lnodes[1]+j)*lnodes[2]+k)*bs+c] / scale[c];
+        }
+      }
+    }
+  }
+  ierr = VecRestoreArrayRead(Xloc, &xloc); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(dm, Xdm, &xdm); CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 // User provided TS Monitor
 static PetscErrorCode TSMonitor_NS(TS ts, PetscInt stepno, PetscReal time,
                                    Vec Q, void *ctx) {
   User user = ctx;
+  const PetscReal scale[] = {user->units->kgpercubicm,
+                             user->units->kgpersquaredms,
+                             user->units->kgpersquaredms,
+                             user->units->kgpersquaredms,
+                             user->units->Joulepercubicm};
   const PetscScalar *q;
-  PetscScalar ***u;
   Vec U;
-  DMDALocalInfo info;
   char filepath[PETSC_MAX_PATH_LEN];
   PetscViewer viewer;
   PetscErrorCode ierr;
 
+  // Set up output
+  PetscFunctionBeginUser;
   // Print every 'outputfreq' steps
   if (stepno % user->outputfreq != 0)
     PetscFunctionReturn(0);
 
-  // Set up output
-  PetscFunctionBeginUser;
   ierr = DMGetGlobalVector(user->dm, &U); CHKERRQ(ierr);
   ierr = PetscObjectSetName((PetscObject)U, "StateVec");
-  ierr = DMDAGetLocalInfo(user->dm, &info); CHKERRQ(ierr);
-  ierr = DMDAVecGetArray(user->dm, U, &u); CHKERRQ(ierr);
-  ierr = VecGetArrayRead(Q, &q); CHKERRQ(ierr);
-  for (PetscInt i=0; i<info.zm; i++) {
-    for (PetscInt j=0; j<info.ym; j++) {
-      for (PetscInt k=0; k<info.xm; k++) {
-        // scale back each component of solution vector
-        u[info.zs+i][info.ys+j][(info.xs+k)*5 + 0] =
-            q[((i*info.ym+j)*info.xm+k)*5 + 0] / user->units->kgpercubicm;
-        u[info.zs+i][info.ys+j][(info.xs+k)*5 + 1] =
-            q[((i*info.ym+j)*info.xm+k)*5 + 1] / user->units->kgpersquaredms;
-        u[info.zs+i][info.ys+j][(info.xs+k)*5 + 2] =
-            q[((i*info.ym+j)*info.xm+k)*5 + 2] / user->units->kgpersquaredms;
-        u[info.zs+i][info.ys+j][(info.xs+k)*5 + 3] =
-            q[((i*info.ym+j)*info.xm+k)*5 + 3] / user->units->kgpersquaredms;
-        u[info.zs+i][info.ys+j][(info.xs+k)*5 + 4] =
-            q[((i*info.ym+j)*info.xm+k)*5 + 4] / user->units->Joulepercubicm;
-      }
-    }
-  }
-  ierr = VecRestoreArrayRead(Q, &q); CHKERRQ(ierr);
-  ierr = DMDAVecRestoreArray(user->dm, U, &u); CHKERRQ(ierr);
+  ierr = VecScatterBegin(user->ltog, Q, user->Qloc, INSERT_VALUES,
+                         SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->ltog, Q, user->Qloc, INSERT_VALUES,
+                         SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = MapLocalToDMGlobal(user, user->Qloc, U, scale); CHKERRQ(ierr);
 
   // Output
   ierr = PetscSNPrintf(filepath, sizeof filepath, "%s/ns-%03D.vts",
@@ -284,11 +303,12 @@ int main(int argc, char **argv) {
   char problemtype[PETSC_MAX_PATH_LEN] = "density_current";
   PetscInt localNelem, lsize, steps,
            melem[3], mdof[3], p[3], irank[3], ldof[3];
+  PetscBool periodic[3] = {PETSC_FALSE, PETSC_FALSE, PETSC_FALSE};
   PetscMPIInt size, rank;
   PetscScalar ftime;
   PetscScalar *q0, *m, *mult, *x;
-  Vec Q, Qloc, Mloc, X, Xloc;
-  VecScatter ltog, ltog0, gtogD, ltogX;
+  Vec Q, Qloc, Mloc, Xloc;
+  VecScatter ltog, ltog0, gtogD;
 
   Ceed ceed;
   CeedInt numP, numQ;
@@ -393,6 +413,11 @@ int main(int argc, char **argv) {
                             NULL, ly, &ly, NULL); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-lz", "Length scale in z direction",
                             NULL, lz, &lz, NULL); CHKERRQ(ierr);
+  {
+    PetscInt len = 3;
+    ierr = PetscOptionsBoolArray("-periodic", "Periodic boundary conditions",
+                                 NULL, periodic, &len, NULL); CHKERRQ(ierr);
+  }
   ierr = PetscOptionsScalar("-rc", "Characteristic radius of thermal bubble",
                             NULL, rc, &rc, NULL); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-resx","Resolution in x",
@@ -465,7 +490,7 @@ int main(int argc, char **argv) {
     rankleft -= irank[d] * pstride[d];
   }
 
-  GlobalDof(p, irank, degree, melem, mdof);
+  GlobalDof(p, irank, periodic, degree, melem, mdof);
 
   // Set up global state vector
   ierr = VecCreate(comm, &Q); CHKERRQ(ierr);
@@ -481,6 +506,7 @@ int main(int argc, char **argv) {
   }
   ierr = VecCreate(PETSC_COMM_SELF, &Qloc); CHKERRQ(ierr);
   ierr = VecSetSizes(Qloc, 5*lsize, PETSC_DECIDE); CHKERRQ(ierr);
+  ierr = VecSetBlockSize(Qloc, 5); CHKERRQ(ierr);
   ierr = VecSetUp(Qloc); CHKERRQ(ierr);
 
   // Print grid information
@@ -502,15 +528,10 @@ int main(int argc, char **argv) {
   // Set up local mass vector
   ierr = VecDuplicate(Qloc,&Mloc); CHKERRQ(ierr);
 
-  // Set up global coordinates vector
-  ierr = VecCreate(comm, &X); CHKERRQ(ierr);
-  ierr = VecSetSizes(X, 3*mdof[0]*mdof[1]*mdof[2], PETSC_DECIDE);
-  CHKERRQ(ierr);
-  ierr = VecSetUp(X); CHKERRQ(ierr);
-
   // Set up local coordinates vector
   ierr = VecCreate(PETSC_COMM_SELF, &Xloc); CHKERRQ(ierr);
   ierr = VecSetSizes(Xloc, 3*lsize, PETSC_DECIDE); CHKERRQ(ierr);
+  ierr = VecSetBlockSize(Xloc, 3); CHKERRQ(ierr);
   ierr = VecSetUp(Xloc); CHKERRQ(ierr);
 
   // Set up global boundary values vector
@@ -519,15 +540,18 @@ int main(int argc, char **argv) {
   {
     // Create local-to-global scatters
     PetscInt *ltogind, *ltogind0, *locind, l0count;
-    IS ltogis, ltogxis, ltogis0, locis;
+    IS ltogis, ltogis0, locis;
     PetscInt gstart[2][2][2], gmdof[2][2][2][3];
 
     for (int i=0; i<2; i++) {
       for (int j=0; j<2; j++) {
         for (int k=0; k<2; k++) {
           PetscInt ijkrank[3] = {irank[0]+i, irank[1]+j, irank[2]+k};
-          gstart[i][j][k] = GlobalStart(p, ijkrank, degree, melem);
-          GlobalDof(p, ijkrank, degree, melem, gmdof[i][j][k]);
+          for (int d=0; d<3; d++) {
+            if (periodic[d]) ijkrank[d] %= p[d];
+          }
+          gstart[i][j][k] = GlobalStart(p, ijkrank, periodic, degree, melem);
+          GlobalDof(p, ijkrank, periodic, degree, melem, gmdof[i][j][k]);
         }
       }
     }
@@ -543,12 +567,12 @@ int main(int argc, char **argv) {
           PetscInt dofind = (i*ldof[1]+j)*ldof[2]+k;
           ltogind[dofind] =
             gstart[ir][jr][kr] + (ii*gmdof[ir][jr][kr][1]+jj)*gmdof[ir][jr][kr][2]+kk;
-          if ((irank[0] == 0 && i == 0) ||
-              (irank[1] == 0 && j == 0) ||
-              (irank[2] == 0 && k == 0) ||
-              (irank[0]+1 == p[0] && i+1 == ldof[0]) ||
-              (irank[1]+1 == p[1] && j+1 == ldof[1]) ||
-              (irank[2]+1 == p[2] && k+1 == ldof[2]))
+          if ((!periodic[0] && irank[0] == 0 && i == 0) ||
+              (!periodic[1] && irank[1] == 0 && j == 0) ||
+              (!periodic[2] && irank[2] == 0 && k == 0) ||
+              (!periodic[0] && irank[0]+1 == p[0] && i+1 == ldof[0]) ||
+              (!periodic[1] && irank[1]+1 == p[1] && j+1 == ldof[1]) ||
+              (!periodic[2] && irank[2]+1 == p[2] && k+1 == ldof[2]))
             continue;
           ltogind0[l0count] = ltogind[dofind];
           locind[l0count++] = dofind;
@@ -557,10 +581,6 @@ int main(int argc, char **argv) {
     }
 
     // Create local-to-global scatters
-    ierr = ISCreateBlock(comm, 3, lsize, ltogind, PETSC_COPY_VALUES, &ltogxis);
-    CHKERRQ(ierr);
-    ierr = VecScatterCreate(Xloc, NULL, X, ltogxis, &ltogX);
-    CHKERRQ(ierr);
     ierr = ISCreateBlock(comm, 5, lsize, ltogind, PETSC_OWN_POINTER, &ltogis);
     CHKERRQ(ierr);
     ierr = VecScatterCreate(Qloc, NULL, Q, ltogis, &ltog);
@@ -599,7 +619,6 @@ int main(int argc, char **argv) {
       ierr = ISDestroy(&isD); CHKERRQ(ierr);
     }
     ierr = ISDestroy(&ltogis); CHKERRQ(ierr);
-    ierr = ISDestroy(&ltogxis); CHKERRQ(ierr);
     ierr = ISDestroy(&ltogis0); CHKERRQ(ierr);
     ierr = ISDestroy(&locis); CHKERRQ(ierr);
 
@@ -610,16 +629,22 @@ int main(int argc, char **argv) {
       CHKERRQ(ierr);
       for (PetscInt d=0; d<3; d++) {
         for (PetscInt r=0; r<p[d]; r++) {
+          // DMDA coordinate handling for periodic with stencil_width=0 is
+          // ambiguous, so we create a non-periodic DM and map into it from a
+          // local vector; see MapLocalToDMGlobal().
+          const PetscBool noperiodic[3] = {PETSC_FALSE, PETSC_FALSE, PETSC_FALSE};
           PetscInt ijkrank[3] = {irank[0], irank[1], irank[2]};
           ijkrank[d] = r;
           PetscInt ijkdof[3];
-          GlobalDof(p, ijkrank, degree, melem, ijkdof);
+          GlobalDof(p, ijkrank, noperiodic, degree, melem, ijkdof);
           ldofs[d][r] = ijkdof[d];
         }
       }
-      ierr = DMDACreate3d(comm, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE,
-                          DM_BOUNDARY_NONE, DMDA_STENCIL_STAR,
-                          degree*melem[2]*p[2]+1, degree*melem[1]*p[1]+1,
+      ierr = DMDACreate3d(comm,
+                          DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE,
+                          DMDA_STENCIL_STAR,
+                          degree*melem[2]*p[2]+1,
+                          degree*melem[1]*p[1]+1,
                           degree*melem[0]*p[0]+1,
                           p[2], p[1], p[0], 5, 0,
                           ldofs[2], ldofs[1], ldofs[0], &dm); CHKERRQ(ierr);
@@ -839,7 +864,6 @@ int main(int argc, char **argv) {
   CeedVectorSetArray(mceed, CEED_MEM_HOST, CEED_USE_POINTER, m);
 
   // Set up dof coordinate global and local vectors
-  ierr = VecZeroEntries(X); CHKERRQ(ierr);
   ierr = VecGetArray(Xloc, &x); CHKERRQ(ierr);
   CeedVectorSetArray(xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
 
@@ -868,6 +892,7 @@ int main(int argc, char **argv) {
   CeedVectorRestoreArray(multlvec, &mult);
 
   // Destroy mult vecs
+  CeedVectorDestroy(&xceed);
   CeedVectorDestroy(&multevec);
   CeedVectorDestroy(&multlvec);
 
@@ -900,20 +925,18 @@ int main(int argc, char **argv) {
   ierr = VecScatterEnd(gtogD, Q, user->BC, INSERT_VALUES, SCATTER_FORWARD);
   CHKERRQ(ierr);
 
-  // Gather dof coordinates
-  ierr = VecRestoreArray(Xloc, &x); CHKERRQ(ierr);
-  ierr = VecScatterBegin(ltogX, Xloc, X, INSERT_VALUES, SCATTER_FORWARD);
-  CHKERRQ(ierr);
-  ierr = VecScatterEnd(ltogX, Xloc, X, INSERT_VALUES, SCATTER_FORWARD);
-  CHKERRQ(ierr);
+  {
+    PetscReal scale[] = {units->meter, units->meter, units->meter};
+    DM cdm;
+    Vec X;
 
-  // Clean up
-  CeedVectorDestroy(&xceed);
+    ierr = DMGetCoordinateDM(dm, &cdm);CHKERRQ(ierr);
+    ierr = DMCreateGlobalVector(cdm, &X);CHKERRQ(ierr);
+    ierr = MapLocalToDMGlobal(user, Xloc, X, scale);CHKERRQ(ierr);
+    ierr = DMSetCoordinates(dm, X);CHKERRQ(ierr);
+    ierr = VecDestroy(&X);CHKERRQ(ierr);
+  }
   ierr = VecDestroy(&Xloc); CHKERRQ(ierr);
-
-  // Set dof coordinates in DMDA
-  ierr = DMSetCoordinates(dm, X); CHKERRQ(ierr);
-  ierr = VecDestroy(&X); CHKERRQ(ierr);
 
   // Gather the inverse of the mass operator
   ierr = VecRestoreArray(Mloc, &m); CHKERRQ(ierr);
@@ -998,7 +1021,6 @@ int main(int argc, char **argv) {
   ierr = VecScatterDestroy(&ltog); CHKERRQ(ierr);
   ierr = VecScatterDestroy(&ltog0); CHKERRQ(ierr);
   ierr = VecScatterDestroy(&gtogD); CHKERRQ(ierr);
-  ierr = VecScatterDestroy(&ltogX); CHKERRQ(ierr);
   ierr = TSDestroy(&ts); CHKERRQ(ierr);
   ierr = DMDestroy(&dm); CHKERRQ(ierr);
   ierr = PetscFree(units); CHKERRQ(ierr);
