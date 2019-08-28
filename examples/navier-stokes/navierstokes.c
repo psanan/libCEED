@@ -1042,5 +1042,7 @@ int main(int argc, char **argv) {
   ierr = DMDestroy(&dm); CHKERRQ(ierr);
   ierr = PetscFree(units); CHKERRQ(ierr);
   ierr = PetscFree(user); CHKERRQ(ierr);
+  ierr = PetscFunctionListDestroy(&icsflist);CHKERRQ(ierr);
+  ierr = PetscFunctionListDestroy(&qflist);CHKERRQ(ierr);
   return PetscFinalize();
 }
