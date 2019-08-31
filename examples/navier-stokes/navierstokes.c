@@ -33,6 +33,7 @@ const char help[] = "Solve Navier-Stokes using PETSc and libCEED\n";
 #include "common.h"
 #include "advection.h"
 #include "densitycurrent.h"
+#include "string.h"
 
 // Utility function, compute three factors of an integer
 static void Split3(PetscInt size, PetscInt m[3], bool reverse) {
@@ -317,6 +318,7 @@ int main(int argc, char **argv) {
   CeedScalar lambda     = -2./3.;   // -
   CeedScalar mu         = 75.;      // Pa s (dynamic viscosity, not physical for air, but good for numerical stability)
   CeedScalar k          = 0.02638;  // W/(m K)
+  PetscScalar CtauS     = 0.;       // dimensionless
   PetscScalar lx        = 8000.;    // m
   PetscScalar ly        = 8000.;    // m
   PetscScalar lz        = 4000.;    // m
@@ -383,6 +385,8 @@ int main(int argc, char **argv) {
                             NULL, mu, &mu, NULL); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k", "Thermal conductivity",
                             NULL, k, &k, NULL); CHKERRQ(ierr);
+  ierr = PetscOptionsScalar("-CtauScalar", "Scale coefficient for tau",
+                         NULL, CtauS, &CtauS, NULL); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-lx", "Length scale in x direction",
                             NULL, lx, &lx, NULL); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-ly", "Length scale in y direction",
@@ -782,7 +786,13 @@ int main(int argc, char **argv) {
   CeedScalar ctxSetup[12] = {theta0, thetaC, P0, N, cv, cp, Rd, g, rc, lx, ly, lz};
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
   CeedScalar ctxNS[6] = {lambda, mu, k, cv, cp, g};
-  CeedQFunctionSetContext(qf, &ctxNS, sizeof ctxNS);
+  CeedScalar ctxAd[1] = {CtauS};
+  if(strcmp(problemtype,"density_current")==0){
+      CeedQFunctionSetContext(qf, &ctxNS, sizeof ctxNS);
+  }
+  if(strcmp(problemtype,"advection")==0){
+      CeedQFunctionSetContext(qf, &ctxAd, sizeof ctxAd);
+  }
 
   // Set up PETSc context
   // Set up units structure

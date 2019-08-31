@@ -82,15 +82,19 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     const CeedScalar r = sqrt(pow((x - x0[0]), 2) +
                               pow((y - x0[1]), 2) +
                               pow((z - x0[2]), 2));
+//                              0);
+// line above uncommented make a half cylinder  flip comment with 2 lines above to get  half sphere
 
     // Initial Conditions
     q0[0][i] = 1.;
     q0[1][i] = -0.5*(y - center[1]);
     q0[2][i] =  0.5*(x - center[0]);
     q0[3][i] = 0.0;
-    q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
-
+//    q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
+    q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
+// line above adds a conditional to cut the shape in half. 2 lines above is original smooth, full round
     // Homogeneous Dirichlet Boundary Conditions for Momentum
+    if(0) {
     if ( fabs(x - 0.0) < tol || fabs(x - lx) < tol
          || fabs(y - 0.0) < tol || fabs(y - ly) < tol
          || fabs(z - 0.0) < tol || fabs(z - lz) < tol ) {
@@ -98,6 +102,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
       q0[2][i] = 0.0;
       q0[3][i] = 0.0;
     }
+}
 
     // Coordinates
     coords[0][i] = x;
@@ -134,6 +139,10 @@ static int Advection(void *ctx, CeedInt Q,
   // Outputs
   CeedScalar (*v)[Q] = (CeedScalar(*)[Q])out[0],
              (*dv)[5][Q] = (CeedScalar(*)[5][Q])out[1];
+
+  // Context
+  const CeedScalar *context = (const CeedScalar*)ctx;
+  const CeedScalar CtauS      = context[0];
 
   CeedPragmaOMP(simd)
   // Quadrature Point Loop
@@ -205,7 +214,21 @@ static int Advection(void *ctx, CeedInt Q,
     v[3][i] = 0;
 
     // -- Total Energy
-    switch (1) {
+    CeedInt IBP=1; // for now we are setting this to 1 but we could make it a run time arg.  Switch to 0 to get non-IBP on Galerkin term
+    CeedScalar divConv;
+    if(IBP==0 || CtauS > 0){ // only compute if needed
+       CeedScalar div_u = 0, u_dot_grad_E = 0;
+       for (int j=0; j<3; j++) {
+         CeedScalar dEdx_j = 0;
+         for (int k=0; k<3; k++) {
+           div_u += du[k][j] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
+           dEdx_j += dE[k] * dXdx[k][j];
+         }
+         u_dot_grad_E += u[j] * dEdx_j;
+       }
+       divConv = -wJ * (E*div_u + u_dot_grad_E);
+    } 
+    switch (IBP) {
     // ---- Version 1: dv \cdot (E u)
     case 1: {
       for (int j=0; j<3; j++)
@@ -213,21 +236,34 @@ static int Advection(void *ctx, CeedInt Q,
       v[4][i] = 0;
     } break;
     // ---- Version 2: - v (E div(u) + u \cdot grad(E))
-    case 2: {
-      CeedScalar div_u = 0, u_dot_grad_E = 0;
+    case 0: {
       for (int j=0; j<3; j++) {
         dv[j][4][i] = 0;
-        CeedScalar dEdx_j = 0;
-        for (int k=0; k<3; k++) {
-          div_u += du[k][j] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
-          dEdx_j += dE[k] * dXdx[k][j];
-        }
-        u_dot_grad_E += u[j] * dEdx_j;
       }
-      v[4][i] = -wJ * (E*div_u + u_dot_grad_E);
+      v[4][i] = divConv; // moved computation above since Stab needs this either way
     } break;
     }
+    if(CtauS > 0) {
+//stab
+// element measure of  inverse length squared metric from X_{K,i}X_{K,j} (contract on reference index) symmetric storage [0 1 2, 1 3 4, 2, 4, 5]
+// when this is contracxed with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
+// inverted and square root taken.
+      const CeedScalar gijd[6] = {dXdx[0][0]*dXdx[0][0]+dXdx[1][0]*dXdx[1][0]+dXdx[2][0]*dXdx[2][0],
+                                  dXdx[0][0]*dXdx[0][1]+dXdx[1][0]*dXdx[1][1]+dXdx[2][0]*dXdx[2][1],
+                                  dXdx[0][0]*dXdx[0][2]+dXdx[1][0]*dXdx[1][2]+dXdx[2][0]*dXdx[2][2],
+                                  dXdx[0][1]*dXdx[0][1]+dXdx[1][1]*dXdx[1][1]+dXdx[2][1]*dXdx[2][1],
+                                  dXdx[0][1]*dXdx[0][2]+dXdx[1][1]*dXdx[1][2]+dXdx[2][1]*dXdx[2][2],
+                                  dXdx[0][2]*dXdx[0][2]+dXdx[1][2]*dXdx[1][2]+dXdx[2][2]*dXdx[2][2]};
 
+      const CeedScalar uiujgij = ( gijd[0]*u[0]*u[0] + gijd[3]*u[1]*u[1] + gijd[5]*u[2]*u[2]
+                               + 2*gijd[1]*u[0]*u[1] + 2*gijd[2]*u[0]*u[2] + 2*gijd[4]*u[1]*u[2]); 
+      const CeedScalar f1   = sqrt(uiujgij); 
+      const CeedScalar TauS = CtauS/f1;
+      divConv *=TauS;
+      dv[0][4][i] += u[0]*divConv;
+      dv[1][4][i] += u[1]*divConv;
+      dv[2][4][i] += u[2]*divConv;
+    } // end of stabilization
   } // End Quadrature Point Loop
 
   // Return
