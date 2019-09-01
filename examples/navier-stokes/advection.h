@@ -79,22 +79,40 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     const CeedScalar y = X[1][i];
     const CeedScalar z = X[2][i];
     // -- Energy
-    const CeedScalar r = sqrt(pow((x - x0[0]), 2) +
+    CeedScalar r ;
+    switch (1) {
+    //  original sphere
+    case 1: {
+     r = sqrt(pow((x - x0[0]), 2) +
                               pow((y - x0[1]), 2) +
                               pow((z - x0[2]), 2));
-//                              0);
-// line above uncommented make a half cylinder  flip comment with 2 lines above to get  half sphere
-
-    // Initial Conditions
+    } break;
+    // cylinder (needs periodicity to work properly)
+    case 2: {
+     r = sqrt(pow((x - x0[0]), 2) +
+                              pow((y - x0[1]), 2) +
+                              0);
+    } break;
+    }
+    
+    // Initial Conditions  (note speed * 100....attempts to take larger time steps with unit speed did not work out as well for reasons unknown)
     q0[0][i] = 1.;
-    q0[1][i] = -0.5*(y - center[1]);
-    q0[2][i] =  0.5*(x - center[0]);
+    q0[1][i] = -0.5e2*(y - center[1]);
+    q0[2][i] =  0.5e2*(x - center[0]);
     q0[3][i] = 0.0;
-//    q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
-    q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
-// line above adds a conditional to cut the shape in half. 2 lines above is original smooth, full round
+    switch (1) {
+    // original continuous, smooth shape
+    case 1: {
+      q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
+    } break;
+    // discontinuous, sharp back half shape
+    case 0: {
+      q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
+    } break;
+    }
+ 
     // Homogeneous Dirichlet Boundary Conditions for Momentum
-    if(1) {
+    if(1) {  // not so important if you shrink bubble with rc=75/2% domain size but large bubbles that reach boundary don't like discontinuous velocity
     if ( fabs(x - 0.0) < tol || fabs(x - lx) < tol
          || fabs(y - 0.0) < tol || fabs(y - ly) < tol
          || fabs(z - 0.0) < tol || fabs(z - lz) < tol ) {
