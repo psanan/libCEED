@@ -94,7 +94,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
 // line above adds a conditional to cut the shape in half. 2 lines above is original smooth, full round
     // Homogeneous Dirichlet Boundary Conditions for Momentum
-    if(0) {
+    if(1) {
     if ( fabs(x - 0.0) < tol || fabs(x - lx) < tol
          || fabs(y - 0.0) < tol || fabs(y - ly) < tol
          || fabs(z - 0.0) < tol || fabs(z - lz) < tol ) {
