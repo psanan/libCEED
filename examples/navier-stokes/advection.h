@@ -80,18 +80,18 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     const CeedScalar z = X[2][i];
     // -- Energy
     CeedScalar r ;
-    switch (1) {
+    CeedInt dimBubble=3; // 3 is a sphere, 2 is a cylinder
+    switch (dimBubble) {
     //  original sphere
-    case 1: {
-     r = sqrt(pow((x - x0[0]), 2) +
-                              pow((y - x0[1]), 2) +
-                              pow((z - x0[2]), 2));
+    case 3: {
+      r = sqrt(pow((x - x0[0]), 2) +
+               pow((y - x0[1]), 2) +
+               pow((z - x0[2]), 2));
     } break;
     // cylinder (needs periodicity to work properly)
     case 2: {
-     r = sqrt(pow((x - x0[0]), 2) +
-                              pow((y - x0[1]), 2) +
-                              0);
+      r = sqrt(pow((x - x0[0]), 2) +
+               pow((y - x0[1]), 2) );
     } break;
     }
     
@@ -100,13 +100,14 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     q0[1][i] = -0.5e2*(y - center[1]);
     q0[2][i] =  0.5e2*(x - center[0]);
     q0[3][i] = 0.0;
-    switch (1) {
+    CeedInt continuityBubble=-1; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
+    switch (continuityBubble) {
     // original continuous, smooth shape
-    case 1: {
+    case 0: {
       q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
     } break;
     // discontinuous, sharp back half shape
-    case 0: {
+    case -1: {
       q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
     } break;
     }
