@@ -265,7 +265,7 @@ static int Advection(void *ctx, CeedInt Q,
     if(CtauS > 0) {
 //stab
 // element measure of  inverse length squared metric from X_{K,i}X_{K,j} (contract on reference index) symmetric storage [0 1 2, 1 3 4, 2, 4, 5]
-// when this is contracxed with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
+// when this is contracted with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
 // inverted and square root taken.
       const CeedScalar gijd[6] = {dXdx[0][0]*dXdx[0][0]+dXdx[1][0]*dXdx[1][0]+dXdx[2][0]*dXdx[2][0],
                                   dXdx[0][0]*dXdx[0][1]+dXdx[1][0]*dXdx[1][1]+dXdx[2][0]*dXdx[2][1],
