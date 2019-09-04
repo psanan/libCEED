@@ -52,8 +52,8 @@
 //      0.0 flux
 //
 // *****************************************************************************
-static int ICsAdvection(void *ctx, CeedInt Q,
-                        const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
+                             const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
   const CeedScalar (*X)[Q] = (CeedScalar(*)[Q])in[0];
   // Outputs
@@ -65,6 +65,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
   const CeedScalar lx = context[9];
   const CeedScalar ly = context[10];
   const CeedScalar lz = context[11];
+  const CeedScalar *periodic = &context[12];
   // Setup
   const CeedScalar tol = 1.e-14;
   const CeedScalar x0[3] = {0.25*lx, 0.5*ly, 0.5*lz};
@@ -116,15 +117,13 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     }
  
     // Homogeneous Dirichlet Boundary Conditions for Momentum
-    if(1) {  // not so important if you shrink bubble with rc=75/2% domain size but large bubbles that reach boundary don't like discontinuous velocity
-    if ( fabs(x - 0.0) < tol || fabs(x - lx) < tol
-         || fabs(y - 0.0) < tol || fabs(y - ly) < tol
-         || fabs(z - 0.0) < tol || fabs(z - lz) < tol ) {
+    if (   (!periodic[0] && (fabs(x - 0.0) < tol || fabs(x - lx) < tol))
+        || (!periodic[1] && (fabs(y - 0.0) < tol || fabs(y - ly) < tol))
+        || (!periodic[2] && (fabs(z - 0.0) < tol || fabs(z - lz) < tol))) {
       q0[1][i] = 0.0;
       q0[2][i] = 0.0;
       q0[3][i] = 0.0;
     }
-}
 
     // Coordinates
     coords[0][i] = x;
@@ -151,8 +150,8 @@ static int ICsAdvection(void *ctx, CeedInt Q,
 //   dE/dt + div( E u ) = 0
 //
 // *****************************************************************************
-static int Advection(void *ctx, CeedInt Q,
-                     const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
+                          const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
   const CeedScalar (*q)[Q] = (CeedScalar(*)[Q])in[0],
                    (*dq)[5][Q] = (CeedScalar(*)[5][Q])in[1],
@@ -270,21 +269,12 @@ static int Advection(void *ctx, CeedInt Q,
 // element measure of  inverse length squared metric from X_{K,i}X_{K,j} (contract on reference index) symmetric storage [0 1 2, 1 3 4, 2, 4, 5]
 // when this is contracted with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
 // inverted and square root taken.
-      const CeedScalar gijd[6] = {dXdx[0][0]*dXdx[0][0]+dXdx[1][0]*dXdx[1][0]+dXdx[2][0]*dXdx[2][0],
-                                  dXdx[0][0]*dXdx[0][1]+dXdx[1][0]*dXdx[1][1]+dXdx[2][0]*dXdx[2][1],
-                                  dXdx[0][0]*dXdx[0][2]+dXdx[1][0]*dXdx[1][2]+dXdx[2][0]*dXdx[2][2],
-                                  dXdx[0][1]*dXdx[0][1]+dXdx[1][1]*dXdx[1][1]+dXdx[2][1]*dXdx[2][1],
-                                  dXdx[0][1]*dXdx[0][2]+dXdx[1][1]*dXdx[1][2]+dXdx[2][1]*dXdx[2][2],
-                                  dXdx[0][2]*dXdx[0][2]+dXdx[1][2]*dXdx[1][2]+dXdx[2][2]*dXdx[2][2]};
-
-      const CeedScalar uiujgij = ( gijd[0]*u[0]*u[0] + gijd[3]*u[1]*u[1] + gijd[5]*u[2]*u[2]
-                               + 2*gijd[1]*u[0]*u[1] + 2*gijd[2]*u[0]*u[2] + 2*gijd[4]*u[1]*u[2]); 
-      const CeedScalar f1   = sqrt(uiujgij); 
+      CeedScalar uX[3];
+      for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1] + dXdx[j][2]*u[2];
+      const CeedScalar f1   = sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
       const CeedScalar TauS = CtauS/f1;
-      divConv *=TauS;
-      dv[0][4][i] += u[0]*divConv;
-      dv[1][4][i] += u[1]*divConv;
-      dv[2][4][i] += u[2]*divConv;
+      for (int j=0; j<3; j++)
+        dv[j][4][i] += uX[j] * divConv * TauS;
     } // end of stabilization
   } // End Quadrature Point Loop
 
