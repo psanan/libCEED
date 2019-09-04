@@ -81,7 +81,7 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     const CeedScalar z = X[2][i];
     // -- Energy
     CeedScalar r ;
-    CeedInt dimBubble=3; // 3 is a sphere, 2 is a cylinder
+    CeedInt dimBubble=2; // 3 is a sphere, 2 is a cylinder
     switch (dimBubble) {
     //  original sphere
     case 3: {
@@ -101,7 +101,7 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     q0[1][i] = -0.5e2*(y - center[1]);
     q0[2][i] =  0.5e2*(x - center[0]);
     q0[3][i] = 0.0;
-    CeedInt continuityBubble=2; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
+    CeedInt continuityBubble=-1; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
     switch (continuityBubble) {
     // original continuous, smooth shape
     case 0: {
