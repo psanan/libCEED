@@ -100,7 +100,7 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     q0[1][i] = -0.5e2*(y - center[1]);
     q0[2][i] =  0.5e2*(x - center[0]);
     q0[3][i] = 0.0;
-    CeedInt continuityBubble=-1; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
+    CeedInt continuityBubble=2; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
     switch (continuityBubble) {
     // original continuous, smooth shape
     case 0: {
@@ -109,6 +109,9 @@ static int ICsAdvection(void *ctx, CeedInt Q,
     // discontinuous, sharp back half shape
     case -1: {
       q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
+    } break;
+    case 2: {
+      q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc)*fmin(1.0,(center[1]-y)/1.25) : 0.;
     } break;
     }
  
