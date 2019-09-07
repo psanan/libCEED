@@ -24,7 +24,6 @@ namespace ceed {
         ceedElementCount(0),
         ceedElementSize(0),
         ceedComponentCount(0),
-        ceedDofCount(0),
         ceedBlockSize(0) {}
 
     ElemRestriction::~ElemRestriction() {}
@@ -45,13 +44,20 @@ namespace ceed {
       ierr = CeedElemRestrictionGetNumComponents(r, &elemRestriction->ceedComponentCount);
       CeedOccaFromChk(ierr);
 
-      ierr = CeedElemRestrictionGetNumDoF(r, &elemRestriction->ceedDofCount);
-      CeedOccaFromChk(ierr);
-
       ierr = CeedElemRestrictionGetBlockSize(r, &elemRestriction->ceedBlockSize);
       CeedOccaFromChk(ierr);
 
       return elemRestriction;
+    }
+
+    ElemRestriction* ElemRestriction::from(CeedOperatorField operatorField) {
+      int ierr;
+      CeedElemRestriction ceedElemRestriction;
+
+      ierr = CeedOperatorFieldGetElemRestriction(operatorField, &ceedElemRestriction);
+      CeedOccaFromChk(ierr);
+
+      return from(ceedElemRestriction);
     }
 
     ::occa::device ElemRestriction::getDevice() {

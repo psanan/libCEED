@@ -30,7 +30,6 @@ namespace ceed {
       CeedInt ceedElementCount;
       CeedInt ceedElementSize;
       CeedInt ceedComponentCount;
-      CeedInt ceedDofCount;
       CeedInt ceedBlockSize;
 
       // Owned resources
@@ -40,6 +39,7 @@ namespace ceed {
       ~ElemRestriction();
 
       static ElemRestriction* from(CeedElemRestriction r);
+      static ElemRestriction* from(CeedOperatorField operatorField);
 
       ::occa::device getDevice();
 

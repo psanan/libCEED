@@ -136,9 +136,11 @@ namespace ceed {
         switch (emode) {
           case CEED_EVAL_NONE:
           case CEED_EVAL_INTERP:
-          case CEED_EVAL_GRAD:
-            ierr = CeedQFunctionFieldGetNumComponents(qFunctionField, &componentCount); CeedChk(ierr);
+          case CEED_EVAL_GRAD: {
+            ElemRestriction *restrict = ElemRestriction::from(operatorFields[0]);
+            componentCount = restrict->ceedComponentCount;
             break;
+          }
           case CEED_EVAL_WEIGHT:
             componentCount = 1;
             break;
@@ -188,15 +190,14 @@ namespace ceed {
           ); CeedChk(ierr);
         }
 
-#if 0
         if (emode != CEED_EVAL_WEIGHT) {
           ElemRestriction *restrict = ElemRestriction::from(operatorField);
           if (!restrict) {
             return CeedError(ceed, 1, "Incorrect ElemRestriction from opfield[%i]", (int) i);
           }
-          ierr = restrict->setupVector(NULL, eVector); CeedChk(ierr);
+          // TODO: Implement
+          // ierr = restrict->setupVector(NULL, eVector); CeedChk(ierr);
         }
-#endif
       }
       return 0;
     }

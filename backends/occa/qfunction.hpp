@@ -38,7 +38,7 @@ namespace ceed {
       ::occa::memory context;
 
       QFunction(::occa::device device,
-                const std::string &focca);
+                const std::string &source);
 
       ~QFunction();
 

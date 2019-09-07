@@ -21,15 +21,15 @@
 namespace ceed {
   namespace occa {
     QFunction::QFunction(::occa::device device,
-                         const std::string &focca) :
+                         const std::string &source) :
         ceed(NULL),
         ceedInputFields(0),
         ceedOutputFields(0),
         ceedContextSize(0),
         ceedContext(NULL) {
-      const size_t colonIndex = focca.find(':');
-      filename = focca.substr(0, colonIndex);
-      kernelName = focca.substr(colonIndex + 1);
+      const size_t colonIndex = source.find(':');
+      filename = source.substr(0, colonIndex);
+      kernelName = source.substr(colonIndex + 1);
     }
 
     QFunction::~QFunction() {
@@ -139,10 +139,10 @@ namespace ceed {
       ierr = CeedQFunctionGetCeed(qf, &ceed); CeedChk(ierr);
       Context *context;
       ierr = CeedGetData(ceed, (void**) &context); CeedChk(ierr);
-      char *focca;
-      ierr = CeedQFunctionGetFOCCA(qf, &focca); CeedChk(ierr);
+      char *source;
+      ierr = CeedQFunctionGetSourcePath(qf, &source); CeedChk(ierr);
 
-      QFunction *qFunction = new QFunction(context->device, focca);
+      QFunction *qFunction = new QFunction(context->device, source);
       ierr = CeedQFunctionSetData(qf, (void**) &qFunction); CeedChk(ierr);
 
       ierr = registerQFunctionFunction(ceed, qf, "Apply",
