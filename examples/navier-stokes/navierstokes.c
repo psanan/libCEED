@@ -57,22 +57,24 @@ static const char *const problemTypes[] = {"density_current", "advection",
 
 // Problem specific data
 typedef struct {
-  CeedQFunctionUser ics, apply;
-  const char *icsfname, *applyfname;
+  CeedQFunctionUser ics, explicit, implicit, jacobian;
+  const char *icsfname, *explicitfname, *implicitfname, *jacobianfname;
 } problemData;
 
 problemData problemOptions[2] = {
   [NS_DENSITY_CURRENT] = {
     .ics = ICsDC,
-    .apply = DC,
+    .explicit = DC,
     .icsfname = ICsDC_loc,
-    .applyfname = DC_loc
+    .explicitfname = DC_loc
   },
   [NS_ADVECTION] = {
     .ics = ICsAdvection,
-    .apply = Advection,
+    .explicit = ExAdvection,
+    .implicit = ImAdvection,
     .icsfname = ICsAdvection_loc,
-    .applyfname = Advection_loc,
+    .explicitfname = ExAdvection_loc,
+    .implicitfname = ImAdvection_loc,
   }
 };
 
@@ -161,14 +163,15 @@ struct User_ {
   DM dm;
   Ceed ceed;
   Units units;
-  CeedVector qceed, gceed;
-  CeedOperator op;
+  CeedVector qceed, qdotceed, gceed, fceed;
+  CeedOperator op_explicit, op_implicit;
   VecScatter ltog;              // Scatter for all entries
   VecScatter ltog0;             // Skip Dirichlet values for Q
   VecScatter gtogD;             // global-to-global; only Dirichlet values for Q
-  Vec Qloc, Gloc, M, BC;
+  Vec Qloc, Qdotloc, Gloc, Floc, M, BC;
   char outputfolder[PETSC_MAX_PATH_LEN];
   PetscInt contsteps;
+  TS ts;
 };
 
 struct Units_ {
@@ -189,6 +192,7 @@ struct Units_ {
 
 // This is the RHS of the ODE, given as u_t = G(t,u)
 // This function takes in a state vector Q and writes into G
+
 static PetscErrorCode RHS_NS(TS ts, PetscReal t, Vec Q, Vec G, void *userData) {
   PetscErrorCode ierr;
   User user = *(User*)userData;
@@ -210,7 +214,7 @@ static PetscErrorCode RHS_NS(TS ts, PetscReal t, Vec Q, Vec G, void *userData) {
   CeedVectorSetArray(user->gceed, CEED_MEM_HOST, CEED_USE_POINTER, g);
 
   // Apply CEED operator
-  CeedOperatorApply(user->op, user->qceed, user->gceed,
+  CeedOperatorApply(user->op_explicit, user->qceed, user->gceed,
                     CEED_REQUEST_IMMEDIATE);
 
   // Restore vectors
@@ -238,6 +242,69 @@ static PetscErrorCode RHS_NS(TS ts, PetscReal t, Vec Q, Vec G, void *userData) {
 
   PetscFunctionReturn(0);
 }
+
+
+// This is the LHS of the Implicit time stepping method, 
+//given as F(t,Q,Qdot) = 0. This function takes in the state
+//vector Q and its derivative Qdot and writes into F
+static PetscErrorCode IFunction_NS(TS ts, PetscReal t, Vec Q, Vec Qdot, Vec F, void *userData) {
+  PetscErrorCode ierr;
+  User user = *(User*)userData;
+  PetscScalar *q, *qdot, *f;
+  PetscInt qstart, qend;
+
+  // Global-to-local
+  PetscFunctionBeginUser;
+  ierr = VecScatterBegin(user->ltog, Q, user->Qloc, INSERT_VALUES,
+                         SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->ltog, Q, user->Qloc, INSERT_VALUES,
+                       SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = VecScatterBegin(user->ltog, Qdot, user->Qdotloc, INSERT_VALUES,
+                         SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->ltog, Qdot, user->Qdotloc, INSERT_VALUES,
+                       SCATTER_REVERSE); CHKERRQ(ierr);
+  ierr = VecZeroEntries(user->Floc); CHKERRQ(ierr);
+
+  // Ceed Vectors
+  ierr = VecGetArrayRead(user->Qloc, (const PetscScalar**)&q); CHKERRQ(ierr);
+  ierr = VecGetArray(user->Qdotloc, &qdot); CHKERRQ(ierr);
+  ierr = VecGetArray(user->Floc, &f); CHKERRQ(ierr);
+  CeedVectorSetArray(user->qceed, CEED_MEM_HOST, CEED_USE_POINTER, q);
+  CeedVectorSetArray(user->qdotceed, CEED_MEM_HOST, CEED_USE_POINTER, qdot);
+  CeedVectorSetArray(user->fceed, CEED_MEM_HOST, CEED_USE_POINTER, f);
+
+  // Apply CEED operator
+  CeedOperatorApply(user->op_implicit, user->qceed, user->fceed,
+                    CEED_REQUEST_IMMEDIATE);
+
+  // Add the Qdot to the spatial terms to complete implicit function F(t,Q,Qdot)
+  ierr = VecGetOwnershipRange(Q, &qstart, &qend); CHKERRQ(ierr);
+  for (PetscInt i=0; i<qend-qstart; i++) {
+      qdot[i] += f[i];
+  }
+
+  // Restore vectors
+  ierr = VecRestoreArrayRead(user->Qloc, (const PetscScalar**)&q); CHKERRQ(ierr);
+  ierr = VecRestoreArray(user->Qdotloc, &qdot); CHKERRQ(ierr);
+  ierr = VecRestoreArray(user->Floc, &f); CHKERRQ(ierr);
+  ierr = VecZeroEntries(F); CHKERRQ(ierr);
+
+  // Global-to-global
+  // F on the boundary = BC
+  ierr = VecScatterBegin(user->gtogD, user->BC, F, INSERT_VALUES,
+                         SCATTER_FORWARD); CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->gtogD, user->BC, F, INSERT_VALUES,
+                       SCATTER_FORWARD); CHKERRQ(ierr);
+
+  // Local-to-global
+  ierr = VecScatterBegin(user->ltog0, user->Floc, F, ADD_VALUES,
+                         SCATTER_FORWARD); CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->ltog0, user->Floc, F, ADD_VALUES,
+                       SCATTER_FORWARD); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
 
 static PetscErrorCode MapLocalToDMGlobal(User user, Vec Xloc, Vec Xdm, const PetscReal scale[]) {
   PetscErrorCode ierr;
@@ -345,7 +412,7 @@ int main(int argc, char **argv) {
   PetscMPIInt size, rank;
   PetscScalar ftime;
   PetscScalar *q0, *m, *mult, *x;
-  Vec Q, Qloc, Mloc, Xloc;
+  Vec Q, Qdot, Qloc, Qdotloc, Mloc, Xloc;
   VecScatter ltog, ltog0, gtogD;
 
   Ceed ceed;
@@ -355,8 +422,8 @@ int main(int argc, char **argv) {
   CeedBasis basisx, basisxc, basisq;
   CeedElemRestriction restrictx, restrictxc, restrictxi,
                       restrictq, restrictqdi, restrictmult;
-  CeedQFunction qf_setup, qf_mass, qf_ics, qf;
-  CeedOperator op_setup, op_mass, op_ics, op;
+  CeedQFunction qf_setup, qf_mass, qf_ics, qf_explicit, qf_implicit;
+  CeedOperator op_setup, op_mass, op_ics, op_explicit, op_implicit;
   CeedScalar Rd;
   PetscScalar WpermK, Pascal, JperkgK, mpersquareds, kgpercubicm,
               kgpersquaredms, Joulepercubicm;
@@ -517,9 +584,9 @@ int main(int argc, char **argv) {
   resz = fabs(resz) * meter;
 
   // Find a nicely composite number of elements given the resolution
-  melem[0] = (PetscInt)(PetscRoundReal(lx / resx / p[0]));
-  melem[1] = (PetscInt)(PetscRoundReal(ly / resy / p[1]));
-  melem[2] = (PetscInt)(PetscRoundReal(lz / resz / p[2]));
+  melem[0] = (PetscInt)(PetscCeilReal(lx / resx / p[0]));
+  melem[1] = (PetscInt)(PetscCeilReal(ly / resy / p[1]));
+  melem[2] = (PetscInt)(PetscCeilReal(lz / resz / p[2]));
   for (int d=0; d<3; d++) {
     if (melem[d] == 0)
       melem[d]++;
@@ -651,6 +718,7 @@ int main(int argc, char **argv) {
       IS isD;
       const PetscScalar *q;
       ierr = VecZeroEntries(Qloc); CHKERRQ(ierr);
+      ierr = VecDuplicate(Qloc, &Qdotloc); CHKERRQ(ierr);
       ierr = VecSet(Q, 1.0); CHKERRQ(ierr);
       ierr = VecScatterBegin(ltog0, Qloc, Q, INSERT_VALUES, SCATTER_FORWARD);
       CHKERRQ(ierr);
@@ -791,15 +859,26 @@ int main(int argc, char **argv) {
   CeedQFunctionAddOutput(qf_ics, "q0", 5, CEED_EVAL_NONE);
   CeedQFunctionAddOutput(qf_ics, "coords", 3, CEED_EVAL_NONE);
 
-  // Create the Q-function that defines the action of the operator
-  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
-                              problemOptions[problemChoice].applyfname, &qf);
-  CeedQFunctionAddInput(qf, "q", 5, CEED_EVAL_INTERP);
-  CeedQFunctionAddInput(qf, "dq", 5*3, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf, "qdata", 10, CEED_EVAL_NONE);
-  CeedQFunctionAddInput(qf, "x", 3, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf, "v", 5, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf, "dv", 5*3, CEED_EVAL_GRAD);
+  // Create the Q-function that defines the action of the explicit operator
+  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].explicit,
+                              problemOptions[problemChoice].explicitfname, &qf_explicit);
+  CeedQFunctionAddInput(qf_explicit, "q", 5, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_explicit, "dq", 5*3, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_explicit, "qdata", 10, CEED_EVAL_NONE);
+  CeedQFunctionAddInput(qf_explicit, "x", 3, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_explicit, "v", 5, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_explicit, "dv", 5*3, CEED_EVAL_GRAD);
+
+  // Create the Q-function that defines the action of the implicit operator
+  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].implicit,
+                              problemOptions[problemChoice].implicitfname, &qf_implicit);
+  CeedQFunctionAddInput(qf_implicit, "qdot", 5, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_implicit, "q", 5, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_implicit, "dq", 5*3, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_implicit, "qdata", 10, CEED_EVAL_NONE);
+  CeedQFunctionAddInput(qf_implicit, "x", 3, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_implicit, "v", 5, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_implicit, "dv", 5*3, CEED_EVAL_GRAD);
 
   // Create the operator that builds the quadrature data for the NS operator
   CeedOperatorCreate(ceed, qf_setup, NULL, NULL, &op_setup);
@@ -828,20 +907,38 @@ int main(int argc, char **argv) {
   CeedOperatorSetField(op_ics, "coords", restrictxc, CEED_TRANSPOSE,
                        CEED_BASIS_COLLOCATED, xceed);
 
-  // Create the physics operator
-  CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
-  CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE,
+  // Create the physics operator (explicit)
+  CeedOperatorCreate(ceed, qf_explicit, NULL, NULL, &op_explicit);
+  CeedOperatorSetField(op_explicit, "q", restrictq, CEED_TRANSPOSE,
                        basisq, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_explicit, "dq", restrictq, CEED_TRANSPOSE,
                        basisq, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op_explicit, "qdata", restrictqdi, CEED_NOTRANSPOSE,
                        CEED_BASIS_COLLOCATED, qdata);
-  CeedOperatorSetField(op, "x", restrictx, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op_explicit, "x", restrictx, CEED_NOTRANSPOSE,
                        basisx, xcorners);
-  CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_explicit, "v", restrictq, CEED_TRANSPOSE,
                        basisq, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_explicit, "dv", restrictq, CEED_TRANSPOSE,
                        basisq, CEED_VECTOR_ACTIVE);
+
+  // Create the physics operator (implicit)
+  CeedOperatorCreate(ceed, qf_implicit, NULL, NULL, &op_implicit);
+  CeedOperatorSetField(op_implicit, "qdot", restrictq, CEED_TRANSPOSE,
+                       basisq, user->qdotceed);
+  CeedOperatorSetField(op_implicit, "q", restrictq, CEED_TRANSPOSE,
+                       basisq, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_implicit, "dq", restrictq, CEED_TRANSPOSE,
+                       basisq, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_implicit, "qdata", restrictqdi, CEED_NOTRANSPOSE,
+                       CEED_BASIS_COLLOCATED, qdata);
+  CeedOperatorSetField(op_implicit, "x", restrictx, CEED_NOTRANSPOSE,
+                       basisx, xcorners);
+  CeedOperatorSetField(op_implicit, "v", restrictq, CEED_TRANSPOSE,
+                       basisq, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_implicit, "dv", restrictq, CEED_TRANSPOSE,
+                       basisq, CEED_VECTOR_ACTIVE);
+
 
   // Set up the libCEED context
   CeedScalar ctxSetup[15] = {theta0, thetaC, P0, N, cv, cp, Rd, g, rc, lx, ly, lz, periodic[0], periodic[1], periodic[2]};
@@ -850,10 +947,11 @@ int main(int argc, char **argv) {
   CeedScalar ctxAd[1] = {CtauS};
   switch (problemChoice) {
   case NS_DENSITY_CURRENT:
-    CeedQFunctionSetContext(qf, &ctxNS, sizeof ctxNS);
+    CeedQFunctionSetContext(qf_explicit, &ctxNS, sizeof ctxNS);
     break;
   case NS_ADVECTION:
-    CeedQFunctionSetContext(qf, &ctxAd, sizeof ctxAd);
+    CeedQFunctionSetContext(qf_implicit, &ctxAd, sizeof ctxAd);
+    CeedQFunctionSetContext(qf_explicit, &ctxAd, sizeof ctxAd);
     break;
   default: SETERRQ1(comm, PETSC_ERR_SUP, "Unhandled problem type %d", (int)problemChoice);
   }
@@ -882,13 +980,18 @@ int main(int argc, char **argv) {
   user->dm = dm;
   user->ceed = ceed;
   CeedVectorCreate(ceed, 5*lsize, &user->qceed);
+  CeedVectorCreate(ceed, 5*lsize, &user->qdotceed);
   CeedVectorCreate(ceed, 5*lsize, &user->gceed);
-  user->op = op;
+  CeedVectorCreate(ceed, 5*lsize, &user->fceed);
+  user->op_explicit = op_explicit;
+  user->op_implicit = op_implicit;
   user->ltog = ltog;
   user->ltog0 = ltog0;
   user->gtogD = gtogD;
   user->Qloc = Qloc;
+  user->Qdotloc = Qdotloc;
   ierr = VecDuplicate(Qloc, &user->Gloc); CHKERRQ(ierr);
+  ierr = VecDuplicate(Qloc, &user->Floc); CHKERRQ(ierr);
 
   // Calculate qdata and ICs
   // Set up state global and local vectors
@@ -976,7 +1079,7 @@ int main(int argc, char **argv) {
   }
   ierr = VecDestroy(&Xloc); CHKERRQ(ierr);
 
-  // Gather the inverse of the mass operator
+  // Gather the mass operator
   ierr = VecRestoreArray(Mloc, &m); CHKERRQ(ierr);
   ierr = VecScatterBegin(ltog, Mloc, user->M, ADD_VALUES, SCATTER_FORWARD);
   CHKERRQ(ierr);
@@ -989,11 +1092,30 @@ int main(int argc, char **argv) {
   ierr = VecReciprocal(user->M); // M is now Minv
   CHKERRQ(ierr);
 
+
   // Create and setup TS
   ierr = TSCreate(comm, &ts); CHKERRQ(ierr);
-  ierr = TSSetType(ts, TSRK); CHKERRQ(ierr);
-  ierr = TSRKSetType(ts, TSRK5F); CHKERRQ(ierr);
-  ierr = TSSetRHSFunction(ts, NULL, RHS_NS, &user); CHKERRQ(ierr);
+  switch (problemChoice) {
+  case NS_DENSITY_CURRENT:
+    ierr = TSSetType(ts, TSRK); CHKERRQ(ierr);
+    ierr = TSRKSetType(ts, TSRK5F); CHKERRQ(ierr);
+    ierr = TSSetRHSFunction(ts, NULL, RHS_NS, &user); CHKERRQ(ierr);
+    break;
+  case NS_ADVECTION:
+    if (1) {   //for now implicit method is set for advection but we can make it a run time argument.
+        ierr = TSSetType(ts, TSBEULER); CHKERRQ(ierr);
+        ierr = TSSetIFunction(ts, NULL, IFunction_NS, &user); CHKERRQ(ierr);
+      };
+    if (0) {       
+        ierr = TSSetType(ts, TSRK); CHKERRQ(ierr);
+        ierr = TSRKSetType(ts, TSRK5F); CHKERRQ(ierr);
+        ierr = TSSetRHSFunction(ts, NULL, RHS_NS, &user); CHKERRQ(ierr);
+      };
+    break;
+  default: SETERRQ1(comm, PETSC_ERR_SUP, "Unhandled problem type %d", (int)problemChoice);
+  }
+//  ierr = TSSetType(ts, TSBEULER); CHKERRQ(ierr);
+//  ierr = TSSetIFunction(ts, NULL, IFunction_NS, &user); CHKERRQ(ierr);
   ierr = TSSetMaxTime(ts, 500. * units->second); CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER); CHKERRQ(ierr);
   ierr = TSSetTimeStep(ts, 1.e-5 * units->second); CHKERRQ(ierr);
@@ -1020,6 +1142,9 @@ int main(int argc, char **argv) {
   }
   ierr = TSMonitorSet(ts, TSMonitor_NS, user, NULL); CHKERRQ(ierr);
 
+  // Pass ts to the user now that is set
+  user->ts = ts;
+
   // Solve
   ierr = TSSolve(ts, Q); CHKERRQ(ierr);
 
@@ -1033,7 +1158,9 @@ int main(int argc, char **argv) {
   // Clean up libCEED
   CeedVectorDestroy(&qdata);
   CeedVectorDestroy(&user->qceed);
+  CeedVectorDestroy(&user->qdotceed);
   CeedVectorDestroy(&user->gceed);
+  CeedVectorDestroy(&user->fceed);
   CeedVectorDestroy(&xcorners);
   CeedBasisDestroy(&basisq);
   CeedBasisDestroy(&basisx);
@@ -1044,10 +1171,12 @@ int main(int argc, char **argv) {
   CeedElemRestrictionDestroy(&restrictxi);
   CeedQFunctionDestroy(&qf_setup);
   CeedQFunctionDestroy(&qf_ics);
-  CeedQFunctionDestroy(&qf);
+  CeedQFunctionDestroy(&qf_explicit);
+  CeedQFunctionDestroy(&qf_implicit);
   CeedOperatorDestroy(&op_setup);
   CeedOperatorDestroy(&op_ics);
-  CeedOperatorDestroy(&op);
+  CeedOperatorDestroy(&op_explicit);
+  CeedOperatorDestroy(&op_implicit);
   CeedDestroy(&ceed);
 
   // Clean up PETSc
@@ -1055,7 +1184,9 @@ int main(int argc, char **argv) {
   ierr = VecDestroy(&user->M); CHKERRQ(ierr);
   ierr = VecDestroy(&user->BC); CHKERRQ(ierr);
   ierr = VecDestroy(&user->Qloc); CHKERRQ(ierr);
+  ierr = VecDestroy(&user->Qdotloc); CHKERRQ(ierr);
   ierr = VecDestroy(&user->Gloc); CHKERRQ(ierr);
+  ierr = VecDestroy(&user->Floc); CHKERRQ(ierr);
   ierr = VecScatterDestroy(&ltog); CHKERRQ(ierr);
   ierr = VecScatterDestroy(&ltog0); CHKERRQ(ierr);
   ierr = VecScatterDestroy(&gtogD); CHKERRQ(ierr);
