@@ -14,7 +14,6 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include <string.h>
 #include "ceed-ref.h"
 
 static int CeedVectorSetArray_Ref(CeedVector vec, CeedMemType mtype,
@@ -28,7 +27,9 @@ static int CeedVectorSetArray_Ref(CeedVector vec, CeedMemType mtype,
   ierr = CeedVectorGetCeed(vec, &ceed); CeedChk(ierr);
 
   if (mtype != CEED_MEM_HOST)
+    // LCOV_EXCL_START
     return CeedError(ceed, 1, "Only MemType = HOST supported");
+  // LCOV_EXCL_STOP
   ierr = CeedFree(&impl->array_allocated); CeedChk(ierr);
   switch (cmode) {
   case CEED_COPY_VALUES:
@@ -55,7 +56,9 @@ static int CeedVectorGetArray_Ref(CeedVector vec, CeedMemType mtype,
   ierr = CeedVectorGetCeed(vec, &ceed); CeedChk(ierr);
 
   if (mtype != CEED_MEM_HOST)
+    // LCOV_EXCL_START
     return CeedError(ceed, 1, "Can only provide to HOST memory");
+  // LCOV_EXCL_STOP
   if (!impl->array) { // Allocate if array is not yet allocated
     ierr = CeedVectorSetArray(vec, CEED_MEM_HOST, CEED_COPY_VALUES, NULL);
     CeedChk(ierr);
@@ -73,7 +76,9 @@ static int CeedVectorGetArrayRead_Ref(CeedVector vec, CeedMemType mtype,
   ierr = CeedVectorGetCeed(vec, &ceed); CeedChk(ierr);
 
   if (mtype != CEED_MEM_HOST)
+    // LCOV_EXCL_START
     return CeedError(ceed, 1, "Can only provide to HOST memory");
+  // LCOV_EXCL_STOP
   if (!impl->array) { // Allocate if array is not yet allocated
     ierr = CeedVectorSetArray(vec, CEED_MEM_HOST, CEED_COPY_VALUES, NULL);
     CeedChk(ierr);

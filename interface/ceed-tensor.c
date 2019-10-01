@@ -26,9 +26,10 @@
 /**
   @brief Create a CeedTensorContract object for a CeedBasis
 
-  @param ceed       A Ceed object where the CeedTensorContract will be created
-  @param contract   Address of the variable where the newly created
-                      CeedTensorContract will be stored.
+  @param ceed          A Ceed object where the CeedTensorContract will be created
+  @param basis         CeedBasis for which the tensor contraction will be used
+  @param[out] contract Address of the variable where the newly created
+                         CeedTensorContract will be stored.
 
   @return An error code: 0 - success, otherwise - failure
 
@@ -40,11 +41,14 @@ int CeedTensorContractCreate(Ceed ceed, CeedBasis basis,
 
   if (!ceed->TensorContractCreate) {
     Ceed delegate;
-    ierr = CeedGetDelegate(ceed, &delegate); CeedChk(ierr);
+    ierr = CeedGetObjectDelegate(ceed, &delegate, "TensorContract");
+    CeedChk(ierr);
 
     if (!delegate)
+      // LCOV_EXCL_START
       return CeedError(ceed, 1,
                        "Backend does not support TensorContractCreate");
+    // LCOV_EXCL_STOP
 
     ierr = CeedTensorContractCreate(delegate, basis, contract);
     CeedChk(ierr);

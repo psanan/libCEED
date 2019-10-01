@@ -21,19 +21,20 @@ static int CeedInit_Tmpl(const char *resource, Ceed ceed) {
   int ierr;
   if (strcmp(resource, "/cpu/self")
       && strcmp(resource, "/cpu/self/tmpl"))
+    // LCOV_EXCL_START
     return CeedError(ceed, 1, "Tmpl backend cannot use resource: %s", resource);
-
-  Ceed ceedref;
+  // LCOV_EXCL_STOP
 
   // Create refrence CEED that implementation will be dispatched
   //   through unless overridden
+  Ceed ceedref;
   CeedInit("/cpu/self/ref/blocked", &ceedref);
-  ierr = CeedSetDelegate(ceed, &ceedref); CeedChk(ierr);
+  ierr = CeedSetDelegate(ceed, ceedref); CeedChk(ierr);
 
   return 0;
 }
 
 __attribute__((constructor))
 static void Register(void) {
-  CeedRegister("/cpu/self/tmpl", CeedInit_Tmpl, 50);
+  CeedRegister("/cpu/self/tmpl", CeedInit_Tmpl, 60);
 }

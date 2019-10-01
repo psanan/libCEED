@@ -7,7 +7,7 @@ from junit_xml import TestCase, TestSuite
 
 def parse_testargs(file):
     if os.path.splitext(file)[1] in ['.c', '.cpp']:
-        return sum([line.split()[1:] for line in open(file).readlines()
+        return sum([[line.split()[1:]] for line in open(file).readlines()
                     if line.startswith('//TESTARGS')], [])
     elif os.path.splitext(file)[1] in ['.f', '.usr']:
         return sum([line.split()[2:] for line in open(file).readlines()
@@ -23,7 +23,7 @@ def get_source(test):
     elif test.startswith('mfem-'):
         return os.path.join('examples', 'mfem', test[5:] + '.cpp')
     elif test.startswith('nek-'):
-        return os.path.join('examples', 'nek5000', test[4:] + '.usr')
+        return os.path.join('examples', 'nek', 'bps', test[4:] + '.usr')
     elif test.startswith('ex'):
         return os.path.join('examples', 'ceed', test + '.c')
     elif test.endswith('-f'):
@@ -31,10 +31,11 @@ def get_source(test):
     else:
         return os.path.join('tests', test + '.c')
 
+
 def get_testargs(source):
     args = parse_testargs(source)
     if not args:
-        args = ['{ceed_resource}']
+        args = [['{ceed_resource}']]
     return args
 
 def check_required_failure(case, stderr, required):
@@ -48,62 +49,72 @@ def run(test, backends):
     import time
     import difflib
     source = get_source(test)
-    args = get_testargs(source)
+    allargs = get_testargs(source)
+
     testcases = []
     badcount = 0
-    for ceed_resource in backends:
-        rargs = [os.path.join('build', test)] + args.copy()
-        rargs[rargs.index('{ceed_resource}')] = ceed_resource
-        start = time.time()
-        proc = subprocess.run(rargs,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE)
-        proc.stdout = proc.stdout.decode('utf-8')
-        proc.stderr = proc.stderr.decode('utf-8')
+    for args in allargs:
+        for ceed_resource in backends:
+            rargs = [os.path.join('build', test)] + args.copy()
+            rargs[rargs.index('{ceed_resource}')] = ceed_resource
+            start = time.time()
+            proc = subprocess.run(rargs,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
+            proc.stdout = proc.stdout.decode('utf-8')
+            proc.stderr = proc.stderr.decode('utf-8')
 
-        case = TestCase('{} {}'.format(test, ceed_resource),
-                        classname=os.path.dirname(source),
-                        elapsed_sec=time.time()-start,
-                        timestamp=time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(start)),
-                        stdout=proc.stdout,
-                        stderr=proc.stderr)
-        ref_stdout = os.path.join('output', test + '.out')
+            case = TestCase('{} {}'.format(test, ceed_resource),
+                            classname=os.path.dirname(source),
+                            elapsed_sec=time.time()-start,
+                            timestamp=time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(start)),
+                            stdout=proc.stdout,
+                            stderr=proc.stderr)
+            ref_stdout = os.path.join('tests/output', test + '.out')
 
-        if proc.stderr:
-            if 'OCCA backend failed to use' in proc.stderr:
-                case.add_skipped_info('occa mode not supported {} {}'.format(test, ceed_resource))
-            elif 'Backend does not implement' in proc.stderr:
-                case.add_skipped_info('not implemented {} {}'.format(test, ceed_resource))
-
-        if not case.is_skipped():
-            if test[:4] in 't103 t105 t106'.split():
-                check_required_failure(case, proc.stderr, 'Cannot grant CeedVector array access')
-            if test[:4] in 't104'.split():
-                check_required_failure(case, proc.stderr, 'Cannot destroy CeedVector, the access lock is in use')
-            if test[:4] in 't107'.split():
-                check_required_failure(case, proc.stderr, 'Cannot restore CeedVector array access, access was not granted')
-            if test[:4] in 't308'.split():
-                check_required_failure(case, proc.stderr, 'Length of input/output vectors incompatible with basis dimensions')
-
-        if not case.is_skipped() and not case.status:
             if proc.stderr:
-                case.add_failure_info('stderr', proc.stderr)
-            elif proc.returncode != 0:
-                case.add_error_info('returncode = {}'.format(proc.returncode))
-            elif os.path.isfile(ref_stdout):
-                with open(ref_stdout) as ref:
-                    diff = list(difflib.unified_diff(ref.readlines(),
-                                                     proc.stdout.splitlines(keepends=True),
-                                                     fromfile=ref_stdout,
-                                                     tofile='New'))
-                if diff:
-                    case.add_failure_info('stdout', output=''.join(diff))
-            elif proc.stdout:
-                case.add_failure_info('stdout', output=proc.stdout)
-        testcases.append(case)
-        if case.is_error() or case.is_failure():
-            badcount += 1
-    return TestSuite(test, testcases), badcount
+                if 'OCCA backend failed to use' in proc.stderr:
+                    case.add_skipped_info('occa mode not supported {} {}'.format(test, ceed_resource))
+                elif 'Backend does not implement' in proc.stderr:
+                    case.add_skipped_info('not implemented {} {}'.format(test, ceed_resource))
+                elif 'Can only provide to HOST memory' in proc.stderr:
+                    case.add_skipped_info('device memory not supported {} {}'.format(test, ceed_resource))
+                elif test[:4] in 'ex1 ex2 t410 t411 t412'.split() and 'occa' in ceed_resource:
+                    case.add_skipped_info('Gallery not supported {} {}'.format(test, ceed_resource))
+
+            if not case.is_skipped():
+                if test[:4] in 't110 t111 t112 t113 t114'.split():
+                    check_required_failure(case, proc.stderr, 'Cannot grant CeedVector array access')
+                if test[:4] in 't115'.split():
+                    check_required_failure(case, proc.stderr, 'Cannot grant CeedVector read-only array access, the access lock is already in use')
+                if test[:4] in 't116'.split():
+                    check_required_failure(case, proc.stderr, 'Cannot destroy CeedVector, the access lock is in use')
+                if test[:4] in 't117'.split():
+                    check_required_failure(case, proc.stderr, 'Cannot restore CeedVector array access, access was not granted')
+                if test[:4] in 't118'.split():
+                    check_required_failure(case, proc.stderr, 'Cannot sync CeedVector, the access lock is already in use')
+                if test[:4] in 't303'.split():
+                    check_required_failure(case, proc.stderr, 'Length of input/output vectors incompatible with basis dimensions')
+
+            if not case.is_skipped() and not case.status:
+                if proc.stderr:
+                    case.add_failure_info('stderr', proc.stderr)
+                elif proc.returncode != 0:
+                    case.add_error_info('returncode = {}'.format(proc.returncode))
+                elif os.path.isfile(ref_stdout):
+                    with open(ref_stdout) as ref:
+                        diff = list(difflib.unified_diff(ref.readlines(),
+                                                         proc.stdout.splitlines(keepends=True),
+                                                         fromfile=ref_stdout,
+                                                         tofile='New'))
+                    if diff:
+                        case.add_failure_info('stdout', output=''.join(diff))
+                elif proc.stdout:
+                    case.add_failure_info('stdout', output=proc.stdout)
+            testcases.append(case)
+            if case.is_error() or case.is_failure():
+                badcount += 1
+        return TestSuite(test, testcases), badcount
 
 if __name__ == '__main__':
     import argparse
