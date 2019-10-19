@@ -43,9 +43,9 @@ const char help[] = "Solve Navier-Stokes using PETSc and libCEED\n";
 #include <ceed.h>
 #include <stdbool.h>
 #include <petscsys.h>
-#include "common.h"
-#include "advection.h"
-#include "densitycurrent.h"
+#include "common.h"  // provides 3D metric computation functions
+#include "advection.h" // solves scalar advection through a constrained energy equation
+#include "densitycurrent.h" // full Navier-Stokes
 
 // Problem Options
 typedef enum {
