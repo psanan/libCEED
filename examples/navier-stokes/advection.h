@@ -120,6 +120,13 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
   return 0;
 }
 
+typedef struct Advection2dContext_ *Advection2dContext;
+struct Advection2dContext_ {
+  CeedScalar CtauS;
+  CeedScalar strong_form;
+  int stabilization; // See StabilizationType: 0=none, 1=SU, 2=SUPG
+};
+
 // *****************************************************************************
 // This QFunction implements the following formulation of the advection equation
 //
@@ -144,11 +151,14 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
   // Outputs
   CeedScalar (*v)[Q] = (CeedScalar(*)[Q])out[0],
              (*dv)[5][Q] = (CeedScalar(*)[5][Q])out[1];
-
-  // Context
-  const CeedScalar *context = (const CeedScalar*)ctx;
-  const CeedScalar CtauS      = context[0];
+/* OLD WAY...NOT SURE IF THIS SHOULD HAVE WORKED AFTER ENUMERATION REPLACED BY STRUCT
+  const CeedScalar *context = (const CeedScalar *)ctx;
+  const CeedScalar CtauS = context[0];
   const CeedScalar strong_form = context[1];
+*/
+  Advection2dContext context = ctx;
+  const CeedScalar CtauS = context->CtauS;
+  const CeedScalar strong_form = context->strong_form;
 
   CeedPragmaSIMD
   // Quadrature Point Loop
@@ -194,6 +204,119 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
                                      qdata[8][i],
                                      qdata[9][i]}
                                    };
+// Note with the order that du was filled and the order that dXdx was filled 
+//   du[j][k]= du_j / dX_K    (note cap K to be clear this is u_{j,xi_k} ) 
+//   dXdx[k][j] = dX_K / dx_j
+//   X_K=Kth reference element coordinate (note cap X and K instead of xi_k}
+//   x_j and u_j are jth  physical position and velocity components
+
+    // The Physics
+
+    // No Change in density or momentum
+    for (int f=0; f<4; f++) {
+      for (int j=0; j<3; j++)
+        dv[j][f][i] = 0;
+      v[f][i] = 0;
+    }
+
+    // -- Total Energy
+    // Evaluate the strong form using div(E u) = u . grad(E) + E div(u)
+    // or in index notation: (u_j E)_{,j} = u_j E_j + E u_{j,j}
+    CeedScalar div_u = 0, u_dot_grad_E = 0;
+    for (int j=0; j<3; j++) {
+      CeedScalar dEdx_j = 0;
+      for (int k=0; k<3; k++) {
+        div_u += du[j][k] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
+        dEdx_j += dE[k] * dXdx[k][j];
+      }
+      u_dot_grad_E += u[j] * dEdx_j;
+    }
+    CeedScalar strongConv = E*div_u + u_dot_grad_E;
+
+    // Weak Galerkin convection term: dv \cdot (E u)
+    for (int j=0; j<3; j++)
+      dv[j][4][i] = (1 - strong_form) * wJ * E * (u[0]*dXdx[j][0] + u[1]*dXdx[j][1])+ u[2]*dXdx[j][2]);
+    v[4][i] = 0;
+
+    // Strong Galerkin convection term: - v div(E u)
+    v[4][i] = -strong_form * wJ * strongConv;
+
+    // Stabilization requires a measure of element transit time in the velocity
+    // field u.
+    CeedScalar uX[3];
+    for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1];
+    const CeedScalar TauS = CtauS / sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
+    for (int j=0; j<3; j++)
+      dv[j][4][i] -= wJ * TauS * strongConv * uX[j];
+  } // End Quadrature Point Loop
+
+  return 0;
+}
+
+CEED_QFUNCTION(IFunction_Advection)(void *ctx, CeedInt Q,
+                          const CeedScalar *const *in, CeedScalar *const *out) {
+  // Inputs
+  const CeedScalar (*q)[Q] = (CeedScalar(*)[Q])in[0],
+                   (*dq)[5][Q] = (CeedScalar(*)[5][Q])in[1],
+                   (*qdot)[Q] = (CeedScalar(*)[Q])in[2],
+                   (*qdata)[Q] = (CeedScalar(*)[Q])in[3];
+  // Outputs
+  CeedScalar (*v)[Q] = (CeedScalar(*)[Q])out[0],
+             (*dv)[5][Q] = (CeedScalar(*)[5][Q])out[1];
+  Advection2dContext context = ctx;
+  const CeedScalar CtauS = context->CtauS;
+  const CeedScalar strong_form = context->strong_form;
+
+  CeedPragmaSIMD
+  // Quadrature Point Loop
+  for (CeedInt i=0; i<Q; i++) {
+    // Setup
+    // -- Interp in
+    const CeedScalar rho        =    q[0][i];
+    const CeedScalar u[3]       =   {q[1][i] / rho,
+                                     q[2][i] / rho,
+                                     q[3][i] / rho
+                                    };
+    const CeedScalar E          =    q[4][i];
+    // -- Grad in
+    const CeedScalar drho[3]    =   {dq[0][0][i],
+                                     dq[1][0][i],
+                                     dq[2][0][i]
+                                    };
+    const CeedScalar du[3][3]   = {{(dq[0][1][i] - drho[0]*u[0]) / rho,
+                                    (dq[1][1][i] - drho[1]*u[0]) / rho,
+                                    (dq[2][1][i] - drho[2]*u[0]) / rho},
+                                   {(dq[0][2][i] - drho[0]*u[1]) / rho,
+                                    (dq[1][2][i] - drho[1]*u[1]) / rho,
+                                    (dq[2][2][i] - drho[2]*u[1]) / rho},
+                                   {(dq[0][3][i] - drho[0]*u[2]) / rho,
+                                    (dq[1][3][i] - drho[1]*u[2]) / rho,
+                                    (dq[2][3][i] - drho[2]*u[2]) / rho}
+                                  };
+    const CeedScalar dE[3]      =   {dq[0][4][i],
+                                     dq[1][4][i],
+                                     dq[2][4][i]
+                                    };
+    // -- Interp-to-Interp qdata
+    const CeedScalar wJ         =    qdata[0][i];
+    // -- Interp-to-Grad qdata
+    // ---- Inverse of change of coordinate matrix: X_i,j
+    const CeedScalar dXdx[3][3] =  {{qdata[1][i],
+                                     qdata[2][i],
+                                     qdata[3][i]},
+                                    {qdata[4][i],
+                                     qdata[5][i],
+                                     qdata[6][i]},
+                                    {qdata[7][i],
+                                     qdata[8][i],
+                                     qdata[9][i]}
+                                   };
+// Note with the order that du was filled and the order that dXdx was filled 
+//   du[j][k]= du_j / dX_K    (note cap K to be clear this is u_{j,xi_k} ) 
+//   dXdx[k][j] = dX_K / dx_j
+//   X_K=Kth reference element coordinate (note cap X and K instead of xi_k}
+//   x_j and u_j are jth  physical position and velocity components
+
 
     // The Physics
 
@@ -201,53 +324,50 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
     for (int f=0; f<4; f++) {
       for (int j=0; j<2; j++)
         dv[j][f][i] = 0;
-      v[f][i] = 0;
+      v[f][i] = wJ * qdot[f][i]; //K Mass/transient term 
     }
 
     // -- Total Energy
-    CeedScalar divConv;
-    if(strong_form==1 || CtauS > 0){ // only compute if needed
-       CeedScalar div_u = 0, u_dot_grad_E = 0;
-       for (int j=0; j<3; j++) {
-         CeedScalar dEdx_j = 0;
-         for (int k=0; k<3; k++) {
-           div_u += du[k][j] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
-           dEdx_j += dE[k] * dXdx[k][j];
-         }
-         u_dot_grad_E += u[j] * dEdx_j;
-       }
-       divConv = -wJ * (E*div_u + u_dot_grad_E);
-    } 
-    switch (strong_form) {
-    // ---- Version 1: dv \cdot (E u)
-    case 0: {
-      for (int j=0; j<3; j++)
-        dv[j][4][i] = wJ * E * (u[0]*dXdx[j][0] + u[1]*dXdx[j][1] + u[2]*dXdx[j][2]);
-      v[4][i] = 0;
-    } break;
-    // ---- Version 2: - v (E div(u) + u \cdot grad(E))
-    case 1: {
-      for (int j=0; j<3; j++) {
-        dv[j][4][i] = 0;
+    // Evaluate the strong form using div(E u) = u . grad(E) + E div(u)
+    // or in index notation: (u_j E)_{,j} = u_j E_j + E u_{j,j}
+    CeedScalar div_u = 0, u_dot_grad_E = 0;
+    for (int j=0; j<3; j++) {
+      CeedScalar dEdx_j = 0;
+      for (int k=0; k<3; k++) {
+        div_u += du[j][k] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
+        dEdx_j += dE[k] * dXdx[k][j];
       }
-      v[4][i] = divConv; // moved computation above since Stab needs this either way
-    } break;
+      u_dot_grad_E += u[j] * dEdx_j;
     }
-    if(CtauS > 0) {
-//stab
-// element measure of  inverse length squared metric from X_{K,i}X_{K,j} (contract on reference index) symmetric storage [0 1 2, 1 3 4, 2, 4, 5]
-// when this is contracted with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
-// inverted and square root taken.
-      CeedScalar uX[3];
-      for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1] + dXdx[j][2]*u[2];
-        const CeedScalar f1   = sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
-        const CeedScalar TauS = CtauS/f1;
-        for (int j=0; j<3; j++)
-          dv[j][4][i] += uX[j] * divConv * TauS;
-    } // end of stabilization
+    CeedScalar strongConv = E*div_u + u_dot_grad_E;
+    CeedScalar strongResid = qdot[4][i] + strongConv;
+
+    v[4][i] = wJ * qdot[4][i]; // transient part (ALWAYS)
+
+    // Weak Galerkin convection term: -dv \cdot (E u)
+    for (int j=0; j<3; j++)
+      dv[j][4][i] = -wJ * (1 - strong_form) * E * (u[0]*dXdx[j][0] + u[1]*dXdx[j][1]);
+
+    // Strong Galerkin convection term: v div(E u)
+    v[4][i] += wJ * strong_form * strongConv;
+
+    // Stabilization requires a measure of element transit time in the velocity
+    // field u.
+    CeedScalar uX[3];
+    for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1] + dXdx[j][2]*u[2];
+    const CeedScalar TauS = CtauS / sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
+
+    for (int j=0; j<3; j++)
+      switch (context->stabilization) {
+      case 0:
+        break;
+      case 1: dv[j][4][i] += wJ * TauS * strongConv * uX[j];
+        break;
+      case 2: dv[j][4][i] += wJ * TauS * strongResid * uX[j];
+        break;
+      }
   } // End Quadrature Point Loop
 
-  // Return
   return 0;
 }
 

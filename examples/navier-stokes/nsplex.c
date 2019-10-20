@@ -85,7 +85,7 @@ typedef struct {
 problemData problemOptions[] = { //K key data for runtime choice of problem
   [NS_DENSITY_CURRENT] = {
     .dim = 3,
-    .qdatasize = 16,
+    .qdatasize = 10,
     .setup = Setup,
     .setup_loc = Setup_loc,
     .ics = ICsDC,
@@ -96,14 +96,16 @@ problemData problemOptions[] = { //K key data for runtime choice of problem
   },
   [NS_ADVECTION] = {
     .dim = 3,
-    .qdatasize = 16,
+    .qdatasize = 10,
     .setup = Setup,
     .setup_loc = Setup_loc,
     .ics = ICsAdvection,
     .apply_rhs = Advection,
     .bc = NULL,
     .ics_loc = ICsAdvection_loc,
-    .apply_rhs_loc = Advection_loc, //K ifunction is not here yet but probably have to mimic what JB did below for NS_ADVECTION2D in the next commit so that I can repeat his results in 3D
+    .apply_rhs_loc = Advection_loc,  
+    .apply_ifunction = IFunction_Advection,
+    .apply_ifunction_loc = IFunction_Advection_loc,
   },
   [NS_ADVECTION2D] = {
     .dim = 2,
@@ -847,7 +849,7 @@ int main(int argc, char **argv) {
     CeedQFunctionSetContext(qf_rhs, &ctxNS, sizeof ctxNS);
     CeedQFunctionSetContext(qf_ifunction, &ctxNS, sizeof ctxNS);
     break;
-  case NS_ADVECTION: //K with no "break" this case will get ctxAdvection2d 
+  case NS_ADVECTION: //K with no "break" this case will get ctxAdvection2d.  Changes made to advection.h to use struct for both rhs and ifunction.  Same for rhs in advection2d.h that was still using enumerated ctx. No need for a separate one as nothing depends on dimension.
   case NS_ADVECTION2D:
     CeedQFunctionSetContext(qf_rhs, &ctxAdvection2d, sizeof ctxAdvection2d);
     CeedQFunctionSetContext(qf_ifunction, &ctxAdvection2d, sizeof ctxAdvection2d);
