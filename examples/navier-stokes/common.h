@@ -109,7 +109,7 @@ CEED_QFUNCTION(Setup)(void *ctx, CeedInt Q,
   // Return
   return 0;
 }
-
+// NEW BUT WE CAN SKIP THIS AS IT IS ONLY NEEDED for advection2d.h 
 CEED_QFUNCTION(Setup2d)(void *ctx, CeedInt Q,
                       const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs

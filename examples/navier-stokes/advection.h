@@ -71,16 +71,43 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     const CeedScalar y = X[1][i];
     const CeedScalar z = X[2][i];
     // -- Energy
-    const CeedScalar r = sqrt(pow((x - x0[0]), 2) +
-                              pow((y - x0[1]), 2) +
-                              pow((z - x0[2]), 2));
-
-    // Initial Conditions
+    CeedScalar r ;
+    CeedInt dimBubble=2; // 3 is a sphere, 2 is a cylinder
+    switch (dimBubble) {
+    //  original sphere
+    case 3: {
+      r = sqrt(pow((x - x0[0]), 2) +
+               pow((y - x0[1]), 2) +
+               pow((z - x0[2]), 2));
+    } break;
+    // cylinder (needs periodicity to work properly)
+    case 2: {
+      r = sqrt(pow((x - x0[0]), 2) +
+               pow((y - x0[1]), 2) );
+    } break;
+    }
+    
+    // Initial Conditions  (note speed * 100....attempts to take larger time steps with unit speed did not work out as well for reasons unknown)
     q0[0][i] = 1.;
-    q0[1][i] = -(y - center[1]);
-    q0[2][i] =  (x - center[0]);
-    q0[3][i] = 0;
-    q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
+    q0[1][i] = -0.5e2*(y - center[1]);
+    q0[2][i] =  0.5e2*(x - center[0]);
+    q0[3][i] = 0.0;
+    CeedInt continuityBubble=-1; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
+    switch (continuityBubble) {
+    // original continuous, smooth shape
+    case 0: {
+      q0[4][i] = r <= rc ? (1.-r/rc) : 0.;
+    } break;
+    // discontinuous, sharp back half shape
+    case -1: {
+      q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc) : 0.;
+    } break;
+    // attempt to define a finite thickness that will get resolved under grid refinement
+    case 2: {
+      q0[4][i] = ((r <= rc) && (y<center[1])) ? (1.-r/rc)*fmin(1.0,(center[1]-y)/1.25) : 0.;
+    } break;
+    }
+
 
     // Coordinates
     coords[0][i] = x;
@@ -117,6 +144,11 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
   // Outputs
   CeedScalar (*v)[Q] = (CeedScalar(*)[Q])out[0],
              (*dv)[5][Q] = (CeedScalar(*)[5][Q])out[1];
+
+  // Context
+  const CeedScalar *context = (const CeedScalar*)ctx;
+  const CeedScalar CtauS      = context[0];
+  const CeedScalar strong_form = context[1];
 
   CeedPragmaSIMD
   // Quadrature Point Loop
@@ -165,52 +197,54 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
 
     // The Physics
 
-    // -- Density
-    // ---- No Change
-    dv[0][0][i] = 0;
-    dv[1][0][i] = 0;
-    dv[2][0][i] = 0;
-    v[0][i] = 0;
-
-    // -- Momentum
-    // ---- No Change
-    dv[0][1][i] = 0;
-    dv[1][1][i] = 0;
-    dv[2][1][i] = 0;
-    dv[0][2][i] = 0;
-    dv[1][2][i] = 0;
-    dv[2][2][i] = 0;
-    dv[0][3][i] = 0;
-    dv[1][3][i] = 0;
-    dv[2][3][i] = 0;
-    v[1][i] = 0;
-    v[2][i] = 0;
-    v[3][i] = 0;
+    // No Change in density or momentum
+    for (int f=0; f<4; f++) {
+      for (int j=0; j<2; j++)
+        dv[j][f][i] = 0;
+      v[f][i] = 0;
+    }
 
     // -- Total Energy
-    switch (1) {
+    CeedScalar divConv;
+    if(strong_form==1 || CtauS > 0){ // only compute if needed
+       CeedScalar div_u = 0, u_dot_grad_E = 0;
+       for (int j=0; j<3; j++) {
+         CeedScalar dEdx_j = 0;
+         for (int k=0; k<3; k++) {
+           div_u += du[k][j] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
+           dEdx_j += dE[k] * dXdx[k][j];
+         }
+         u_dot_grad_E += u[j] * dEdx_j;
+       }
+       divConv = -wJ * (E*div_u + u_dot_grad_E);
+    } 
+    switch (strong_form) {
     // ---- Version 1: dv \cdot (E u)
-    case 1: {
+    case 0: {
       for (int j=0; j<3; j++)
         dv[j][4][i] = wJ * E * (u[0]*dXdx[j][0] + u[1]*dXdx[j][1] + u[2]*dXdx[j][2]);
       v[4][i] = 0;
     } break;
     // ---- Version 2: - v (E div(u) + u \cdot grad(E))
-    case 2: {
-      CeedScalar div_u = 0, u_dot_grad_E = 0;
+    case 1: {
       for (int j=0; j<3; j++) {
         dv[j][4][i] = 0;
-        CeedScalar dEdx_j = 0;
-        for (int k=0; k<3; k++) {
-          div_u += du[k][j] * dXdx[k][j]; // u_{j,j} = u_{j,K} X_{K,j}
-          dEdx_j += dE[k] * dXdx[k][j];
-        }
-        u_dot_grad_E += u[j] * dEdx_j;
       }
-      v[4][i] = -wJ * (E*div_u + u_dot_grad_E);
+      v[4][i] = divConv; // moved computation above since Stab needs this either way
     } break;
     }
-
+    if(CtauS > 0) {
+//stab
+// element measure of  inverse length squared metric from X_{K,i}X_{K,j} (contract on reference index) symmetric storage [0 1 2, 1 3 4, 2, 4, 5]
+// when this is contracted with u_i u_j it measures the length of the element in the direction of the velocity vector to create a time scale when
+// inverted and square root taken.
+      CeedScalar uX[3];
+      for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1] + dXdx[j][2]*u[2];
+        const CeedScalar f1   = sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
+        const CeedScalar TauS = CtauS/f1;
+        for (int j=0; j<3; j++)
+          dv[j][4][i] += uX[j] * divConv * TauS;
+    } // end of stabilization
   } // End Quadrature Point Loop
 
   // Return

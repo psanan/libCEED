@@ -48,7 +48,7 @@ const char help[] = "Solve Navier-Stokes using PETSc and libCEED\n";
 #include "advection2d.h"
 #include "densitycurrent.h"
 
-// Problem Options
+// Problem Options //K strings mapped to numbers
 typedef enum {
   NS_DENSITY_CURRENT = 0,
   NS_ADVECTION = 1,
@@ -70,7 +70,7 @@ typedef struct {
   const char *setup_loc, *icsfname, *applyfname;
 } problemData;
 
-problemData problemOptions[] = {
+problemData problemOptions[] = { //K key data for runtime choice of problem
   [NS_DENSITY_CURRENT] = {
     .dim = 3,
     .qdatasize = 16,
@@ -639,98 +639,104 @@ int main(int argc, char **argv) {
   // Set up CEED
   // CEED Bases
   CeedInit(ceedresource, &ceed);
-  numP = degree + 1;
-  numQ = numP + qextra;
-  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompq, numP, numQ, CEED_GAUSS,
-                                  &basisq);
-  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, numQ, CEED_GAUSS,
-                                  &basisx);
-  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, numP,
-                                  CEED_GAUSS_LOBATTO, &basisxc);
+  numP = degree + 1; //K modes along one dim of element
+  numQ = numP + qextra; //K nqpts along one dim of the element
+  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompq, numP, numQ, CEED_GAUSS, //K ncompq is components of q, 5 for 3D NS
+                                  &basisq); //K B for solution
+  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, numQ, CEED_GAUSS, //K ncompx is nsd 
+                                  &basisx); //K B for x and its gradients.  In this code X is \xi
+  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, numP, //K qpt slot has numP modal/nodal quadrature is Gauss Lobatto
+                                  CEED_GAUSS_LOBATTO, &basisxc); //K B that will get coordinates of the modes to Q function
 
-  ierr = DMGetCoordinateDM(dm, &dmcoord);CHKERRQ(ierr);
-  ierr = DMPlexSetClosurePermutationTensor(dmcoord,PETSC_DETERMINE,NULL);CHKERRQ(ierr);
+  ierr = DMGetCoordinateDM(dm, &dmcoord);CHKERRQ(ierr); //K? looks like dm is ?associated? with coordinates of all the modes
+  ierr = DMPlexSetClosurePermutationTensor(dmcoord,PETSC_DETERMINE,NULL);CHKERRQ(ierr); //K? dmcoord is corner nodes
 
   // CEED Restrictions
   ierr = CreateRestrictionFromPlex(ceed, dm, degree+1, &restrictq);CHKERRQ(ierr);
   ierr = CreateRestrictionFromPlex(ceed, dmcoord, 2, &restrictx);CHKERRQ(ierr);
   DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);CHKERRQ(ierr);
   localNelem = cEnd - cStart;
-  CeedInt numQdim = CeedIntPow(numQ, dim);
+  CeedInt numQdim = CeedIntPow(numQ, dim); //K assumes TP qpt; numQ^3
   CeedElemRestrictionCreateIdentity(ceed, localNelem, numQdim,
-                                    localNelem*numQdim, qdatasize,
-                                    &restrictqdi);
+                                    localNelem*numQdim, qdatasize, //K metrics at qpts
+                                    &restrictqdi); //K G_si
   CeedElemRestrictionCreateIdentity(ceed, localNelem, numQdim,
                                     localNelem*numQdim, 1,
-                                    &restrictxi);
-  CeedElemRestrictionCreateIdentity(ceed, localNelem, PetscPowInt(numP, dim),
+                                    &restrictxi); //K G_xi
+  CeedElemRestrictionCreateIdentity(ceed, localNelem, PetscPowInt(numP, dim), //K TP element
                                     localNelem*PetscPowInt(numP, dim), ncompx,
-                                    &restrictxcoord);
+                                    &restrictxcoord); //K mode locations
 
   ierr = DMGetCoordinatesLocal(dm, &Xloc);CHKERRQ(ierr);
-  ierr = CreateVectorFromPetscVec(ceed, Xloc, &xcorners);CHKERRQ(ierr);
+  ierr = CreateVectorFromPetscVec(ceed, Xloc, &xcorners);CHKERRQ(ierr); //K vertices/nodes of mesh, "corners", endpoints of mesh edges PHASTA calls these nodes as a subset of modes which includes all shape functions.  libCEED uses nodes 
 
   // Create the CEED vectors that will be needed in setup
   CeedInt Nqpts, Nnodes;
   CeedBasisGetNumQuadraturePoints(basisq, &Nqpts);
   CeedInt Ndofs = 1;
-  for (int d=0; d<3; d++) Ndofs *= numP;
-  CeedVectorCreate(ceed, qdatasize*localNelem*Nqpts, &qdata);
-  CeedElemRestrictionCreateVector(restrictq, &q0ceed, NULL);
+  for (int d=0; d<3; d++) Ndofs *= numP; //K? why numP^3 so this is modes per element
+  CeedVectorCreate(ceed, qdatasize*localNelem*Nqpts, &qdata); //K size of qptdata to be shared
+  CeedElemRestrictionCreateVector(restrictq, &q0ceed, NULL); 
   CeedElemRestrictionCreateVector(restrictxcoord, &xceed, NULL);
 
   // Create the Q-function that builds the quadrature data for the NS operator
   CeedQFunctionCreateInterior(ceed, 1, problem->setup, problem->setup_loc, &qf_setup);
-  CeedQFunctionAddInput(qf_setup, "dx", ncompx*dim, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT);
-  CeedQFunctionAddOutput(qf_setup, "qdata", qdatasize, CEED_EVAL_NONE);
+  CeedQFunctionAddInput(qf_setup, "dx", ncompx*dim, CEED_EVAL_GRAD); //K like mass example take ref-domain gradient on the way in 
+  CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT); //K like mass example grab weight too
+  CeedQFunctionAddOutput(qf_setup, "qdata", qdatasize, CEED_EVAL_NONE); //K like mass exampl but now 3d so qdatasize is 10...see common.h that holds setup for details
 
   // Create the Q-function that sets the ICs of the operator
-  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].ics,
+  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].ics, //enumerated above 
                               problemOptions[problemChoice].icsfname, &qf_ics);
-  CeedQFunctionAddInput(qf_ics, "x", ncompx, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_ics, "x", ncompx, CEED_EVAL_INTERP); //K comments on this are in SetField Below
   CeedQFunctionAddOutput(qf_ics, "q0", ncompq, CEED_EVAL_NONE);
-  CeedQFunctionAddOutput(qf_ics, "coords", ncompx, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_ics, "coords", ncompx, CEED_EVAL_NONE); //K used by navierstokes.c for viz but not by this code (nsplex.c) as PETSc does that 
 
   // Create the Q-function that defines the action of the operator
   CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
                               problemOptions[problemChoice].applyfname, &qf);
-  CeedQFunctionAddInput(qf, "q", ncompq, CEED_EVAL_INTERP);
-  CeedQFunctionAddInput(qf, "dq", ncompq*dim, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf, "qdata", qdatasize, CEED_EVAL_NONE);
-  CeedQFunctionAddInput(qf, "x", ncompx, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf, "v", ncompq, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf, "dv", ncompq*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf, "q", ncompq, CEED_EVAL_INTERP);//K The operator command line input data interpolated to qpts
+  CeedQFunctionAddInput(qf, "dq", ncompq*dim, CEED_EVAL_GRAD);//K The operator command line input data gradient interpolated 
+  CeedQFunctionAddInput(qf, "qdata", qdatasize, CEED_EVAL_NONE);//K setup data is shared into apply
+  CeedQFunctionAddInput(qf, "x", ncompx, CEED_EVAL_INTERP); //K coordinates interpolated 
+  CeedQFunctionAddOutput(qf, "v", ncompq, CEED_EVAL_INTERP); //K output at Q function level that will hit N_b
+  CeedQFunctionAddOutput(qf, "dv", ncompq*dim, CEED_EVAL_GRAD); //K output at Q function level that will hit N_{b,i}
+                                                                //K and then  (B^T op) summed together over all qpts to give G_b^e (E-vector not seen)
+                                                                //K and then  G^T applied to return L-Vector TRUE output of the OperatorApply function
 
   // Create the operator that builds the quadrature data for the NS operator
   CeedOperatorCreate(ceed, qf_setup, NULL, NULL, &op_setup);
-  CeedOperatorSetField(op_setup, "dx", restrictx, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_setup, "dx", restrictx, CEED_TRANSPOSE, //K AddInput says gradient using basisx of operatorApply defined from xcorners
                        basisx, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_setup, "weight", restrictxi, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op_setup, "weight", restrictxi, CEED_NOTRANSPOSE, //K get the weight to setup Q function 
                        basisx, CEED_VECTOR_NONE);
-  CeedOperatorSetField(op_setup, "qdata", restrictqdi, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op_setup, "qdata", restrictqdi, CEED_NOTRANSPOSE,//K output of setup Q function metric data at quadrature points to share with op
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
-  // Create the operator that sets the ICs
+  // Create the operator that sets the ICs  \\K the   TEST we reviewed did not have need to setup ICs but a real solver does so here is another Q function
   CeedOperatorCreate(ceed, qf_ics, NULL, NULL, &op_ics);
-  CeedOperatorSetField(op_ics, "x", restrictx, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_ics, "x", restrictx, CEED_TRANSPOSE, //K input is x interpolated NOT to qpts but to mode points--needed to evaluate IC in a Q function 
                        basisxc, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_ics, "q0", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op_ics, "q0", restrictq, CEED_TRANSPOSE, //K this is the output of the Q function which brings solution back as an L-Vector (on modes)
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_ics, "coords", restrictxcoord, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op_ics, "coords", restrictxcoord, CEED_NOTRANSPOSE,  
                        CEED_BASIS_COLLOCATED, xceed);
+//K This is a comment I was going to make to JB in the modes/nodes debate.  Saving for later. OK.  What was making me think of these as locations was
+// CeedOperatorSetField(op_ics, "x", restrictx, CEED_TRANSPOSE, 
+// basisxc, CEED_VECTOR_ACTIVE);``` 
+//which I interpreted as getting the xyz locations of the C_a for an interpolation like sigma_a^nshp N_a(X) C_a (X being the reference coordinate).  For Lagrange/interpolatory basis N_a(X_b) = \delta_{ab}  (where X_b are the reference domain locations of the so C_a is just the solution at x_a which seems consistent with ics 
 
   // Create the physics operator
   CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
-  CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_i G_q Q
                        basisq, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_{gi} G_q Q
                        basisq, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE, //K shared data from setup is "set"
                        CEED_BASIS_COLLOCATED, qdata);
-  CeedOperatorSetField(op, "x", restrictx, CEED_NOTRANSPOSE,
+  CeedOperatorSetField(op, "x", restrictx, CEED_NOTRANSPOSE, //K this is how you pass data vectors that are not I/O but needed in operator
                        basisx, xcorners);
-  CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE,
+  CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE,  //K output
                        basisq, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE,
                        basisq, CEED_VECTOR_ACTIVE);
@@ -742,7 +748,7 @@ int main(int argc, char **argv) {
   case NS_DENSITY_CURRENT:
     CeedQFunctionSetContext(qf, &ctxNS, sizeof ctxNS);
     break;
-  case NS_ADVECTION:
+  case NS_ADVECTION: //K with no "break" this case will get ctxAdvection 
   case NS_ADVECTION2D:
     CeedQFunctionSetContext(qf, &ctxAdvection, sizeof ctxAdvection);
   }
