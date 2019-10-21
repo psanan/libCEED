@@ -87,7 +87,7 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     } break;
     }
     
-    // Initial Conditions  (note speed * 100....attempts to take larger time steps with unit speed did not work out as well for reasons unknown)
+    // Initial Conditions 
     q0[0][i] = 1.;
     q0[1][i] = -(y - center[1]);
     q0[2][i] =  (x - center[0]);
