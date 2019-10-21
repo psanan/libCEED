@@ -89,8 +89,8 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     
     // Initial Conditions  (note speed * 100....attempts to take larger time steps with unit speed did not work out as well for reasons unknown)
     q0[0][i] = 1.;
-    q0[1][i] = -0.5e2*(y - center[1]);
-    q0[2][i] =  0.5e2*(x - center[0]);
+    q0[1][i] = -(y - center[1]);
+    q0[2][i] =  (x - center[0]);
     q0[3][i] = 0.0;
     CeedInt continuityBubble=-1; // 0 is original sphere switch to -1 to challenge solver with sharp gradients in back half of bubble
     switch (continuityBubble) {
