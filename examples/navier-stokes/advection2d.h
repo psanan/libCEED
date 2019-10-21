@@ -99,13 +99,14 @@ CEED_QFUNCTION(ICsAdvection2d)(void *ctx, CeedInt Q,
   // Return
   return 0;
 }
-
+/*
 typedef struct Advection2dContext_ *Advection2dContext;
 struct Advection2dContext_ {
   CeedScalar CtauS;
   CeedScalar strong_form;
   int stabilization; // See StabilizationType: 0=none, 1=SU, 2=SUPG
 };
+*/
 
 // *****************************************************************************
 // This QFunction implements the following formulation of the advection equation
