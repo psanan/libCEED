@@ -292,6 +292,7 @@ static PetscErrorCode RHS_NS(TS ts, PetscReal t, Vec Q, Vec G, void *userData) {
   PetscFunctionReturn(0);
 }
 
+//K when implicit this is the key function
 static PetscErrorCode IFunction_NS(TS ts, PetscReal t, Vec Q, Vec Qdot, Vec G, void *userData) {
   PetscErrorCode ierr;
   User user = *(User *)userData;
@@ -320,7 +321,7 @@ static PetscErrorCode IFunction_NS(TS ts, PetscReal t, Vec Q, Vec Qdot, Vec G, v
   CeedVectorSetArray(user->qdotceed, CEED_MEM_HOST, CEED_USE_POINTER, (PetscScalar*)qdot);
   CeedVectorSetArray(user->gceed, CEED_MEM_HOST, CEED_USE_POINTER, g);
 
-  // Apply CEED operator
+  // Apply CEED operator  //K solver for the problem chosen:  search back for op_ifunction
   CeedOperatorApply(user->op_ifunction, user->qceed, user->gceed, CEED_REQUEST_IMMEDIATE);
 
   // Restore vectors
@@ -825,14 +826,14 @@ int main(int argc, char **argv) {
     user->op_rhs = op;
   }
 
-  { // Create the IFunction operator  //K Comment later when added to advection.h
+  { // Create the IFunction operator  //K same as RHS except adding qdot so not duplicating comments 
     CeedOperator op;
     CeedOperatorCreate(ceed, qf_ifunction, NULL, NULL, &op);
     CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE,
                          basisq, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE,
                          basisq, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op, "qdot", restrictq, CEED_TRANSPOSE,
+    CeedOperatorSetField(op, "qdot", restrictq, CEED_TRANSPOSE, //K not an active vector but the is qdot (like ac in PHASTA)
                          basisq, user->qdotceed);
     CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE,
                          CEED_BASIS_COLLOCATED, qdata);
@@ -840,7 +841,7 @@ int main(int argc, char **argv) {
                          basisq, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE,
                          basisq, CEED_VECTOR_ACTIVE);
-    user->op_ifunction = op;
+    user->op_ifunction = op;  //K the above lines set the Fields that will go into the implicit ifunction for the chosen problem.  same as RHS except qdot
   }
 
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
@@ -948,9 +949,9 @@ int main(int argc, char **argv) {
 
   // Create and setup TS
   ierr = TSCreate(comm, &ts); CHKERRQ(ierr);
-  if (implicit) {
+  if (implicit) {  //K this is 2nd order Backward Differences (gen-alpha with rho_inf=0)
     ierr = TSSetType(ts, TSBDF); CHKERRQ(ierr);
-    ierr = TSSetIFunction(ts, NULL, IFunction_NS, &user);CHKERRQ(ierr);
+    ierr = TSSetIFunction(ts, NULL, IFunction_NS, &user);CHKERRQ(ierr);  //K Key line that points it at the IFunction for chosen problem (search back for it)
   } else {
     ierr = TSSetType(ts, TSRK); CHKERRQ(ierr);
     ierr = TSRKSetType(ts, TSRK5F); CHKERRQ(ierr);
