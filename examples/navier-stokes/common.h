@@ -109,7 +109,7 @@ CEED_QFUNCTION(Setup)(void *ctx, CeedInt Q,
   // Return
   return 0;
 }
-// NEW BUT WE CAN SKIP THIS AS IT IS ONLY NEEDED for advection2d.h 
+
 CEED_QFUNCTION(Setup2d)(void *ctx, CeedInt Q,
                       const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
@@ -162,7 +162,7 @@ CEED_QFUNCTION(Mass)(void *ctx, CeedInt Q,
   CeedScalar (*v)[Q] = (CeedScalar(*)[Q])out[0];
 
   CeedPragmaSIMD
-  for (CeedInt i=0; i<Q; i++) {
+  for (CeedInt i=0; i<Q; i++) { //K note that qdata has 10 entries per qpt but 0th one is WdetJ so this works
     v[0][i] = qdata[i] * u[0][i];
     v[1][i] = qdata[i] * u[1][i];
     v[2][i] = qdata[i] * u[2][i];

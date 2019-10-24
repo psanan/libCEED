@@ -317,9 +317,9 @@ static PetscErrorCode IFunction_NS(TS ts, PetscReal t, Vec Q, Vec Qdot, Vec G, v
   ierr = VecGetArrayRead(Qloc, &q); CHKERRQ(ierr);
   ierr = VecGetArrayRead(Qdotloc, &qdot); CHKERRQ(ierr);
   ierr = VecGetArray(Gloc, &g); CHKERRQ(ierr);
-  CeedVectorSetArray(user->qceed, CEED_MEM_HOST, CEED_USE_POINTER, (PetscScalar*)q);
-  CeedVectorSetArray(user->qdotceed, CEED_MEM_HOST, CEED_USE_POINTER, (PetscScalar*)qdot);
-  CeedVectorSetArray(user->gceed, CEED_MEM_HOST, CEED_USE_POINTER, g);
+  CeedVectorSetArray(user->qceed, CEED_MEM_HOST, CEED_USE_POINTER, (PetscScalar*)q); //K OperatorApply input (active)
+  CeedVectorSetArray(user->qdotceed, CEED_MEM_HOST, CEED_USE_POINTER, (PetscScalar*)qdot); //K note that even though this is not I nor O, SetField has setup op_ifunction to grab this data, and send qdot=B G qdotceed to IFunction
+  CeedVectorSetArray(user->gceed, CEED_MEM_HOST, CEED_USE_POINTER, g); //K output of OperatorApply will put result here
 
   // Apply CEED operator  //K solver for the problem chosen:  search back for op_ifunction
   CeedOperatorApply(user->op_ifunction, user->qceed, user->gceed, CEED_REQUEST_IMMEDIATE);
@@ -443,7 +443,7 @@ static PetscErrorCode ComputeLumpedMassMatrix(Ceed ceed, DM dm,
     CeedVector onesvec;
     CeedElemRestrictionCreateVector(restrictq, &onesvec, NULL);
     CeedVectorSetValue(onesvec, 1.0);
-    CeedOperatorApply(op_mass, onesvec, mceed, CEED_REQUEST_IMMEDIATE);
+    CeedOperatorApply(op_mass, onesvec, mceed, CEED_REQUEST_IMMEDIATE); //K this function computes /int_\omega N_B \b{1} d \Omega which gives volume around a node/mode
     CeedVectorDestroy(&onesvec);
     CeedOperatorDestroy(&op_mass);
     CeedVectorDestroy(&mceed);
@@ -709,7 +709,7 @@ int main(int argc, char **argv) {
   }
 
   // Set up global mass vector
-  ierr = VecDuplicate(Q,&user->M); CHKERRQ(ierr);
+  ierr = VecDuplicate(Q,&user->M); CHKERRQ(ierr); //K creates vector at user->M of same shape as Q
 
   // Set up CEED
   // CEED Bases
@@ -727,8 +727,8 @@ int main(int argc, char **argv) {
   ierr = DMPlexSetClosurePermutationTensor(dmcoord,PETSC_DETERMINE,NULL);CHKERRQ(ierr); //K? dmcoord is corner nodes
 
   // CEED Restrictions
-  ierr = CreateRestrictionFromPlex(ceed, dm, degree+1, &restrictq);CHKERRQ(ierr);
-  ierr = CreateRestrictionFromPlex(ceed, dmcoord, 2, &restrictx);CHKERRQ(ierr);
+  ierr = CreateRestrictionFromPlex(ceed, dm, degree+1, &restrictq);CHKERRQ(ierr); //K G_q
+  ierr = CreateRestrictionFromPlex(ceed, dmcoord, 2, &restrictx);CHKERRQ(ierr);   //K G_x
   DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);CHKERRQ(ierr);
   localNelem = cEnd - cStart;
   CeedInt numQdim = CeedIntPow(numQ, dim); //K assumes TP qpt; numQ^3
@@ -740,7 +740,7 @@ int main(int argc, char **argv) {
                                     &restrictxi); //K G_xi
   CeedElemRestrictionCreateIdentity(ceed, localNelem, PetscPowInt(numP, dim), //K TP element
                                     localNelem*PetscPowInt(numP, dim), ncompx,
-                                    &restrictxcoord); //K mode locations
+                                    &restrictxcoord); //K G_xm  mode locations (output of ics but not used in this code)
 
   ierr = DMGetCoordinatesLocal(dm, &Xloc);CHKERRQ(ierr);
   ierr = CreateVectorFromPetscVec(ceed, Xloc, &xcorners);CHKERRQ(ierr); //K vertices/nodes of mesh, "corners", endpoints of mesh edges PHASTA calls these nodes as a subset of modes which includes all shape functions.  libCEED uses nodes 
@@ -748,11 +748,11 @@ int main(int argc, char **argv) {
   // Create the CEED vectors that will be needed in setup
   CeedInt Nqpts, Nnodes;
   CeedBasisGetNumQuadraturePoints(basisq, &Nqpts);
-  CeedInt Ndofs = 1;
-  for (int d=0; d<3; d++) Ndofs *= numP; //K? why numP^3 so this is modes per element
-  CeedVectorCreate(ceed, qdatasize*localNelem*Nqpts, &qdata); //K size of qptdata to be shared
-  CeedElemRestrictionCreateVector(restrictq, &q0ceed, NULL); 
-  CeedElemRestrictionCreateVector(restrictxcoord, &xceed, NULL);
+  CeedInt Ndofs = 1;   //K Ndofs NEVER USED
+  for (int d=0; d<3; d++) Ndofs *= numP; //K? why numP^3 so this is modes per element (ASSUMES TP)
+  CeedVectorCreate(ceed, qdatasize*localNelem*Nqpts, &qdata);    //K size of qptdata to be shared
+  CeedElemRestrictionCreateVector(restrictq, &q0ceed, NULL);     //K passed out of ics  (solution at modes)
+  CeedElemRestrictionCreateVector(restrictxcoord, &xceed, NULL); //K passed out of ics (not used)
 
   // Create the Q-function that builds the quadrature data for the NS operator
   CeedQFunctionCreateInterior(ceed, 1, problem->setup, problem->setup_loc, &qf_setup);
@@ -767,25 +767,26 @@ int main(int argc, char **argv) {
   CeedQFunctionAddOutput(qf_ics, "coords", ncompx, CEED_EVAL_NONE); //K used by navierstokes.c for viz but not by this code (nsplex.c) as PETSc does that 
 
   // Create the Q-function that defines the action of the operator
-  CeedQFunctionCreateInterior(ceed, 1, problem->apply_rhs,
+  CeedQFunctionCreateInterior(ceed, 1, problem->apply_rhs, //K Only used for explicit methods subset of ifunction so not duplicating comments
                               problem->apply_rhs_loc, &qf_rhs);
-  CeedQFunctionAddInput(qf_rhs, "q", ncompq, CEED_EVAL_INTERP);//K The operator command line input data interpolated to qpts
-  CeedQFunctionAddInput(qf_rhs, "dq", ncompq*dim, CEED_EVAL_GRAD);//K The operator command line input data gradient interpolated 
-  CeedQFunctionAddInput(qf_rhs, "qdata", qdatasize, CEED_EVAL_NONE);//K setup data is shared into apply
-  CeedQFunctionAddInput(qf_rhs, "x", ncompx, CEED_EVAL_INTERP); //K coordinates interpolated 
-  CeedQFunctionAddOutput(qf_rhs, "v", ncompq, CEED_EVAL_INTERP); //K output at Q function level that will hit N_b
-  CeedQFunctionAddOutput(qf_rhs, "dv", ncompq*dim, CEED_EVAL_GRAD); //K output at Q function level that will hit N_{b,i}
-                                                                //K and then  (B^T op) summed together over all qpts to give G_b^e (E-vector not seen)
-                                                                //K and then  G^T applied to return L-Vector TRUE output of the OperatorApply function
-  // Create the Q-function that defines the action of the IFunction //K comment later when used
+  CeedQFunctionAddInput(qf_rhs, "q", ncompq, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_rhs, "dq", ncompq*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_rhs, "qdata", qdatasize, CEED_EVAL_NONE);
+  CeedQFunctionAddInput(qf_rhs, "x", ncompx, CEED_EVAL_INTERP); //K coordinates interpolated  PASSED in but not used and thus not in ifunction
+  CeedQFunctionAddOutput(qf_rhs, "v", ncompq, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_rhs, "dv", ncompq*dim, CEED_EVAL_GRAD);
+
+  // Create the Q-function that defines the action of the IFunction 
   CeedQFunctionCreateInterior(ceed, 1, problem->apply_ifunction,
                               problem->apply_ifunction_loc, &qf_ifunction);
-  CeedQFunctionAddInput(qf_ifunction, "q", ncompq, CEED_EVAL_INTERP);
-  CeedQFunctionAddInput(qf_ifunction, "dq", ncompq*dim, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf_ifunction, "qdot", ncompq, CEED_EVAL_INTERP);
-  CeedQFunctionAddInput(qf_ifunction, "qdata", qdatasize, CEED_EVAL_NONE);
-  CeedQFunctionAddOutput(qf_ifunction, "v", ncompq, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf_ifunction, "dv", ncompq*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_ifunction, "q", ncompq, CEED_EVAL_INTERP);//K The operator command line input data interpolated to qpts   
+  CeedQFunctionAddInput(qf_ifunction, "dq", ncompq*dim, CEED_EVAL_GRAD);//K The operator command line input data gradient interpolated   
+  CeedQFunctionAddInput(qf_ifunction, "qdot", ncompq, CEED_EVAL_INTERP); //K time derivative of q interpolated to qpts   
+  CeedQFunctionAddInput(qf_ifunction, "qdata", qdatasize, CEED_EVAL_NONE);//K setup data is shared into apply  
+  CeedQFunctionAddOutput(qf_ifunction, "v", ncompq, CEED_EVAL_INTERP);  //K output at Q function level that will hit N_b 
+  CeedQFunctionAddOutput(qf_ifunction, "dv", ncompq*dim, CEED_EVAL_GRAD);  //K output at Q function level that will hit N_{b,i} 
+                                                                //K and then  (B^T op) summed together over all qpts to give G_b^e (E-vector not seen)
+                                                                //K and then  G^T applied to return L-Vector TRUE output of the OperatorApply function
 
   // Create the operator that builds the quadrature data for the NS operator
   CeedOperatorCreate(ceed, qf_setup, NULL, NULL, &op_setup);
@@ -802,51 +803,52 @@ int main(int argc, char **argv) {
                        basisxc, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_ics, "q0", restrictq, CEED_TRANSPOSE, //K this is the output of the Q function which brings solution back as an L-Vector (on modes)
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_ics, "coords", restrictxcoord, CEED_NOTRANSPOSE,  
+  CeedOperatorSetField(op_ics, "coords", restrictxcoord, CEED_NOTRANSPOSE, //K coords of the modes used to be used for visualization but PETSc-dplex does not use this 
                        CEED_BASIS_COLLOCATED, xceed);
 
-  CeedElemRestrictionCreateVector(restrictq, &user->qceed, NULL);
-  CeedElemRestrictionCreateVector(restrictq, &user->qdotceed, NULL);
-  CeedElemRestrictionCreateVector(restrictq, &user->gceed, NULL);
-  { // Create the RHS physics operator
+  CeedElemRestrictionCreateVector(restrictq, &user->qceed, NULL);//K creating array that will carry solution to ifunction and rhs 
+  CeedElemRestrictionCreateVector(restrictq, &user->qdotceed, NULL);//K creating array that will carry solution to ifunction and rhs  
+  CeedElemRestrictionCreateVector(restrictq, &user->gceed, NULL); //K creating array that will return nodal residual from ifunction and rhs  
+
+  { // Create the RHS physics operator  //K not commenting this since almost the same as IFunction
     CeedOperator op;
     CeedOperatorCreate(ceed, qf_rhs, NULL, NULL, &op);
-    CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_i G_q Q
+    CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE, 
                          basisq, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_{gi} G_q Q
+    CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE, 
                          basisq, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE, //K shared data from setup is "set"
+    CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE, 
                          CEED_BASIS_COLLOCATED, qdata);
     CeedOperatorSetField(op, "x", restrictx, CEED_NOTRANSPOSE, //K this is how you pass data vectors that are not I/O but needed in operator
                          basisx, xcorners);
-    CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE, //K Output
+    CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE, 
                          basisq, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE,
                          basisq, CEED_VECTOR_ACTIVE);
     user->op_rhs = op;
   }
 
-  { // Create the IFunction operator  //K same as RHS except adding qdot so not duplicating comments 
+  { // Create the IFunction operator  
     CeedOperator op;
     CeedOperatorCreate(ceed, qf_ifunction, NULL, NULL, &op);
-    CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE,
+    CeedOperatorSetField(op, "q", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_i G_q Q  
                          basisq, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE,
+    CeedOperatorSetField(op, "dq", restrictq, CEED_TRANSPOSE, //K Active input is current solution vector Q set on OperatorApply line q=B_q_{gi} G_q Q  
                          basisq, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op, "qdot", restrictq, CEED_TRANSPOSE, //K not an active vector but the is qdot (like ac in PHASTA)
                          basisq, user->qdotceed);
-    CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE,
+    CeedOperatorSetField(op, "qdata", restrictqdi, CEED_NOTRANSPOSE, //K shared data from setup is "set"  
                          CEED_BASIS_COLLOCATED, qdata);
-    CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE,
+    CeedOperatorSetField(op, "v", restrictq, CEED_TRANSPOSE, //K Output 
                          basisq, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE,
+    CeedOperatorSetField(op, "dv", restrictq, CEED_TRANSPOSE, //K Output
                          basisq, CEED_VECTOR_ACTIVE);
     user->op_ifunction = op;  //K the above lines set the Fields that will go into the implicit ifunction for the chosen problem.  same as RHS except qdot
   }
 
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
   CeedScalar ctxNS[6] = {lambda, mu, k, cv, cp, g};
-  struct Advection2dContext_ ctxAdvection2d = {
+  struct Advection2dContext_ ctxAdvection2d = { //K struct that passes data needed at quadrature points for both advection
     .CtauS = CtauS,
     .strong_form = strong_form,
     .stabilization = stab,
@@ -858,7 +860,7 @@ int main(int argc, char **argv) {
     break;
   case NS_ADVECTION: //K with no "break" this case will get ctxAdvection2d.  Changes made to advection.h to use struct for both rhs and ifunction.  Same for rhs in advection2d.h that was still using enumerated ctx. No need for a separate one as nothing depends on dimension.
   case NS_ADVECTION2D:
-    CeedQFunctionSetContext(qf_rhs, &ctxAdvection2d, sizeof ctxAdvection2d);
+    CeedQFunctionSetContext(qf_rhs, &ctxAdvection2d, sizeof ctxAdvection2d); //K This function associates the struct with qf_rhs and in next line qf_ifunction
     CeedQFunctionSetContext(qf_ifunction, &ctxAdvection2d, sizeof ctxAdvection2d);
   }
 
@@ -892,11 +894,11 @@ int main(int argc, char **argv) {
 
   // Apply Setup Ceed Operators
   ierr = VectorPlacePetscVec(xcorners, Xloc);CHKERRQ(ierr);
-  CeedOperatorApply(op_setup, xcorners, qdata, CEED_REQUEST_IMMEDIATE);
-  ierr = ComputeLumpedMassMatrix(ceed, dm, restrictq, basisq, restrictqdi, qdata, user->M);CHKERRQ(ierr);
+  CeedOperatorApply(op_setup, xcorners, qdata, CEED_REQUEST_IMMEDIATE); //K Apply setup for the selected case.  Creates qdata: WdetJ and dxidx at qpts
+  ierr = ComputeLumpedMassMatrix(ceed, dm, restrictq, basisq, restrictqdi, qdata, user->M);CHKERRQ(ierr); //K fills user->M, on return is inverse nodal volume/mass. Only used by op_rhs (not ifunction)
 
-  CeedOperatorApply(op_ics, xcorners, q0ceed, CEED_REQUEST_IMMEDIATE);
-  ierr = DMLocalToGlobal(dm, Qloc, ADD_VALUES, Q);CHKERRQ(ierr);
+  CeedOperatorApply(op_ics, xcorners, q0ceed, CEED_REQUEST_IMMEDIATE); //K Apply ics which helps user to set the IC at each "node" of basisq
+  ierr = DMLocalToGlobal(dm, Qloc, ADD_VALUES, Q);CHKERRQ(ierr);       //K? why not INSERT_VALUES
   CeedVectorDestroy(&q0ceed);
   CeedVectorDestroy(&xceed);
   // Fix multiplicity for output of ICs
