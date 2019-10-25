@@ -22,7 +22,7 @@
 typedef struct {
   libxsmm_dmmfunction *kernels;
   bool tensorbasis;
-  CeedInt P, Q, dim, nelem, numkernels;
+  CeedInt P, Q, dim, ncomp, numkernels;
 } CeedTensorContract_Xsmm;
 
 CEED_INTERN int CeedTensorContractCreate_Xsmm(CeedBasis basis,
