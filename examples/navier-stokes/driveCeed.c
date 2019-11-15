@@ -6,11 +6,10 @@
 #include "common.h"
 #include "advection.h"
    
-TURN THIS INTO A main  and read data below
-int    driveceed(double* y,   double* ac,  
-     	double* x,         int* ien,   
-     	double* rest)     
-{
+//int    driveceed(double* y,   double* ac,  
+//     	double* x,         int* ien,   
+//     	double* rest)     
+//{
 //
 //  Can test by replacing passed data above by data written from PHASTA into the file data4libCEED.dat 
 // written as follows (fortran)
