@@ -244,7 +244,7 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
     // Stabilization requires a measure of element transit time in the velocity
     // field u.
     CeedScalar uX[3];
-    for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1];
+    for (int j=0; j<3; j++) uX[j] = dXdx[j][0]*u[0] + dXdx[j][1]*u[1] + dXdx[j][2]*u[2];
     const CeedScalar TauS = CtauS / sqrt(uX[0]*uX[0] + uX[1]*uX[1] + uX[2]*uX[2]);
     for (int j=0; j<3; j++)
       dv[j][4][i] -= wJ * TauS * strongConv * uX[j];
@@ -252,7 +252,7 @@ CEED_QFUNCTION(Advection)(void *ctx, CeedInt Q,
 
   return 0;
 }
-
+// *****************************************************************************
 CEED_QFUNCTION(IFunction_Advection)(void *ctx, CeedInt Q,
                           const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
@@ -361,9 +361,9 @@ CEED_QFUNCTION(IFunction_Advection)(void *ctx, CeedInt Q,
       switch (context->stabilization) {
       case 0:
         break;
-      case 1: dv[j][4][i] += wJ * TauS * strongConv * uX[j];
+      case 1: dv[j][4][i] += wJ * TauS * strongConv * uX[j];  //SU
         break;
-      case 2: dv[j][4][i] += wJ * TauS * strongResid * uX[j];
+      case 2: dv[j][4][i] += wJ * TauS * strongResid * uX[j];  //SUPG
         break;
       }
   } // End Quadrature Point Loop

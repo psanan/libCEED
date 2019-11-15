@@ -47,17 +47,20 @@ const char help[] = "Solve Navier-Stokes using PETSc and libCEED\n";
 #include "advection.h"
 #include "advection2d.h"
 #include "densitycurrent.h"
+#include "densitycurrent_primitive.h"
 
 // Problem Options //K strings mapped to numbers
 typedef enum {
   NS_DENSITY_CURRENT = 0,
   NS_ADVECTION = 1,
   NS_ADVECTION2D = 2,
+  NS_DENSITY_CURRENT_PRIMITIVE = 3
 } problemType;
 static const char *const problemTypes[] = {
   "density_current",
   "advection",
   "advection2d",
+  "density_current_primitive",
   "problemType","NS_",0
 };
 
@@ -90,9 +93,11 @@ problemData problemOptions[] = { //K key data for runtime choice of problem
     .setup_loc = Setup_loc,
     .ics = ICsDC,
     .apply_rhs = DC,
-    .bc = NULL,
     .ics_loc = ICsDC_loc,
-    .apply_rhs_loc = DC_loc
+    .apply_rhs_loc = DC_loc,
+    .apply_ifunction = IFunction_DC,
+    .apply_ifunction_loc = IFunction_DC_loc,
+    .bc = NULL,
   },
   [NS_ADVECTION] = {
     .dim = 3,
@@ -101,11 +106,11 @@ problemData problemOptions[] = { //K key data for runtime choice of problem
     .setup_loc = Setup_loc,
     .ics = ICsAdvection,
     .apply_rhs = Advection,
-    .bc = NULL,
     .ics_loc = ICsAdvection_loc,
     .apply_rhs_loc = Advection_loc,  
     .apply_ifunction = IFunction_Advection,
     .apply_ifunction_loc = IFunction_Advection_loc,
+     .bc = NULL,
   },
   [NS_ADVECTION2D] = {
     .dim = 2,
@@ -119,6 +124,19 @@ problemData problemOptions[] = { //K key data for runtime choice of problem
     .apply_ifunction = IFunction_Advection2d,
     .apply_ifunction_loc = IFunction_Advection2d_loc,
     .bc = NULL,
+  },
+  [NS_DENSITY_CURRENT_PRIMITIVE] = {
+    .dim = 3,
+    .qdatasize = 10,
+    .setup = Setup,
+    .setup_loc = Setup_loc,
+    .ics = ICsDCPrim,
+    .ics_loc = ICsDCPrim_loc,
+    .apply_ifunction = IFunction_DCPrim,
+    .apply_ifunction_loc = IFunction_DCPrim_loc,
+    .bc = NULL,
+    .apply_rhs = DC,
+    .apply_rhs_loc = DC_loc,
   },
 };
 
@@ -220,6 +238,7 @@ struct User_ {
   Vec M;
   char outputfolder[PETSC_MAX_PATH_LEN];
   PetscInt contsteps;
+  PetscReal dt;
 };
 
 struct Units_ {
@@ -464,6 +483,7 @@ int main(int argc, char **argv) {
   MPI_Comm comm;
   DM dm, dmcoord;
   TS ts;
+  PetscReal dt;
   TSAdapt adapt;
   User user;
   Units units;
@@ -521,6 +541,7 @@ int main(int argc, char **argv) {
   PetscInt contsteps    = 0;        // -
   PetscInt degree;
   PetscInt qextra       = 2;        // -
+  dt                    = 1.e-7;    // initial dt
   DMBoundaryType periodicity[] = {DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE};
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
@@ -684,6 +705,7 @@ int main(int argc, char **argv) {
     ierr = DMPlexSetClosurePermutationTensor(dm,PETSC_DETERMINE,NULL);CHKERRQ(ierr);
     ierr = PetscFEGetBasisSpace(fe, &fespace);CHKERRQ(ierr);
     ierr = PetscSpaceGetDegree(fespace, &degree, NULL);CHKERRQ(ierr);
+    if (degree < 1) SETERRQ1(comm, PETSC_ERR_ARG_OUTOFRANGE, "Degree %D; must specify -petscspace_degree 1 (or greater)", degree);
     ierr = PetscFEDestroy(&fe);CHKERRQ(ierr);
   }
   { // Empty name for conserved field
@@ -847,7 +869,7 @@ int main(int argc, char **argv) {
   }
 
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
-  CeedScalar ctxNS[6] = {lambda, mu, k, cv, cp, g};
+  CeedScalar ctxNS[8] = {lambda, mu, k, cv, cp, g, Rd, dt};
   struct Advection2dContext_ ctxAdvection2d = { //K struct that passes data needed at quadrature points for both advection
     .CtauS = CtauS,
     .strong_form = strong_form,
@@ -857,6 +879,14 @@ int main(int argc, char **argv) {
   case NS_DENSITY_CURRENT:
     CeedQFunctionSetContext(qf_rhs, &ctxNS, sizeof ctxNS);
     CeedQFunctionSetContext(qf_ifunction, &ctxNS, sizeof ctxNS);
+    CeedQFunctionSetContext(qf_rhs, &ctxAdvection2d, sizeof ctxAdvection2d); 
+    CeedQFunctionSetContext(qf_ifunction, &ctxAdvection2d, sizeof ctxAdvection2d);
+    break;
+  case NS_DENSITY_CURRENT_PRIMITIVE:
+    CeedQFunctionSetContext(qf_rhs, &ctxNS, sizeof ctxNS);
+    CeedQFunctionSetContext(qf_rhs, &ctxAdvection2d, sizeof ctxAdvection2d); 
+    CeedQFunctionSetContext(qf_ifunction, &ctxNS, sizeof ctxNS);
+    CeedQFunctionSetContext(qf_ifunction, &ctxAdvection2d, sizeof ctxAdvection2d);
     break;
   case NS_ADVECTION: //K with no "break" this case will get ctxAdvection2d.  Changes made to advection.h to use struct for both rhs and ifunction.  Same for rhs in advection2d.h that was still using enumerated ctx. No need for a separate one as nothing depends on dimension.
   case NS_ADVECTION2D:
@@ -948,7 +978,7 @@ int main(int argc, char **argv) {
     //ierr = DMLocalToGlobal(dm, Qloc, INSERT_VALUES, Q);CHKERRQ(ierr);
   }
   ierr = DMRestoreLocalVector(dm, &Qloc);CHKERRQ(ierr);
-
+  
   // Create and setup TS
   ierr = TSCreate(comm, &ts); CHKERRQ(ierr);
   if (implicit) {  //K this is 2nd order Backward Differences (gen-alpha with rho_inf=0)
@@ -967,6 +997,7 @@ int main(int argc, char **argv) {
                               1.e-12 * units->second,
                               1.e2 * units->second); CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts); CHKERRQ(ierr);
+  ierr = TSGetTimeStep (ts, &dt); CHKERRQ(ierr);
   if (!contsteps) { // print initial condition
     ierr = TSMonitor_NS(ts, 0, 0., Q, user); CHKERRQ(ierr);
   } else { // continue from time of last output
@@ -984,6 +1015,9 @@ int main(int argc, char **argv) {
     ierr = TSSetTime(ts, time * user->units->second); CHKERRQ(ierr);
   }
   ierr = TSMonitorSet(ts, TSMonitor_NS, user, NULL); CHKERRQ(ierr);
+
+  // Pass dt to the user
+  user->dt = dt;
 
   // Solve
   ierr = TSSolve(ts, Q); CHKERRQ(ierr);
