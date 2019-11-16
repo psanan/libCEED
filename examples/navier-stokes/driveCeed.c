@@ -6,6 +6,8 @@
 #include "common.h"
 #include "advection.h"
    
+ int main(int argc, char **argv) {
+
 //int    driveceed(double* y,   double* ac,  
 //     	double* x,         int* ien,   
 //     	double* rest)     
@@ -64,7 +66,6 @@
 //      nflow = conpar.nflow; 
 //      numnp = conpar.numnp; 
 //      nen = conpar.nen; 
-      nsd = NSD; 
       int node, element, var, eqn;
       double valtoinsert;
       int nenl, iel, lelCat, lcsyst, iorder;
@@ -81,6 +82,90 @@
       double  real_rtol, real_abstol, real_dtol;
 // /DEBUG
 //
+//  Can test by replacing passed data above by data written from PHASTA into the file data4libCEED.dat 
+// written as follows (fortran)
+//      open(unit=777, file='data4libCEED.dat',status='unknown')
+//      write(777,*) npro,nen 
+//      do i =1,npro
+//        write(777,*) (ien(i,j), j=1,nen)
+//      enddo
+//      write(777,*) numnp,nsd
+//      do i=1,numnp
+//        write(777,*) (point2x(i,j),j=1,nsd)
+//      enddo
+//      write(777,*) numnp,ndof
+//      do i=1,numnp
+//         write(777,*) (y(i,j),j=1,ndof)
+//      enddo
+//      write(777,*) numnp,ndof
+//      do i=1,numnp
+//         write(777,*) (ac(i,j),j=1,ndof)
+//      enddo
+//      close(777)
+//   note, rest is output data thus not needed
+// numbers comming from common.h (PHASTA's not libCEEDs)   
+// nshg=numnp
+// nshl=nen (for this case)
+//      open(unit=777, file='data4libCEED.dat',status='unknown')
+//        FILE *fopen(const char *filename, const char *mode);
+        FILE *fp; 
+        double myvariable;
+        fp=fopen("data4libCEED.dat", "r");
+// connectivity
+        fscanf(fp,"%d",&npro);
+        fscanf(fp,"%d",&nen);
+        int ien[npro*nen];
+        for(int i = 0; i < npro; i++) {
+    	  for (int j = 0 ; j < nen; j++) {
+            fscanf(fp,"%d",&ien[i+j*npro]);
+          }
+        }
+// coordinates
+        fscanf(fp,"%d",&numnp);
+        fscanf(fp,"%d",&nsd);
+        double x[numnp*nsd];
+        for(int i = 0; i < numnp; i++) {
+    	  for (int j = 0 ; j < nsd; j++) {
+            fscanf(fp,"%lf",&x[i+j*numnp]);
+          }
+        }
+        nshg=numnp;
+        double y[numnp*nsd];
+        double ac[numnp*nsd];
+        double rest[numnp*nsd];
+        
+// solution not needed yet
+//        fscanf(fp,"%d",&numnp);
+//        fscanf(fp,"%d",&nsd);
+//        double x[numnp*nsd];
+//        for(int i = 0; i < numnp; i++) {
+//    	  for (int j = 0 ; j < nsd; j++) {
+//            fscanf(fp,"%lf",&x[i+j*nsd]);
+////             printf("%.15f ",myvariable);
+//          }
+////          printf("\n");
+//        }
+//      write(777,*) npro,nen 
+//      do i =1,npro
+//        write(777,*) (ien(i,j), j=1,nen)
+//      enddo
+//      write(777,*) numnp,nsd
+//      do i=1,numnp
+//        write(777,*) (point2x(i,j),j=1,nsd)
+//      enddo
+//      write(777,*) numnp,ndof
+//      do i=1,numnp
+//         write(777,*) (y(i,j),j=1,ndof)
+//      enddo
+//      write(777,*) numnp,ndof
+//      do i=1,numnp
+//         write(777,*) (ac(i,j),j=1,ndof)
+//      enddo
+//      close(777)
+//   note, rest is output data thus not needed
+// numbers comming from common.h (PHASTA's not libCEEDs)   
+// nshg=numnp
+// nshl=nen (for this case)
 
   Ceed ceed;
   CeedElemRestriction restrictx, restrictq, restrictxi, restrictqdi,restrictxFake, restrictxcoord;
@@ -165,7 +250,7 @@
   CeedElemRestrictionCreateIdentity(ceed, npro, qpownsd, qpownsd*npro, qdatasize, &restrictqdi); //metrics shared from setup to residual
   CeedElemRestrictionCreateIdentity(ceed, npro, qpownsd, qpownsd*npro, 1, &restrictxi); // weight
 //! [QFunction Create]
-  CeedQFunctionCreateInterior(ceed, 1, setup, setup_loc, &qf_setup);
+  CeedQFunctionCreateInterior(ceed, 1, Setup, Setup_loc, &qf_setup);
   CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT);
   CeedQFunctionAddInput(qf_setup, "dx", nsd*nsd, CEED_EVAL_GRAD);
   CeedQFunctionAddOutput(qf_setup, "qdata", qdatasize, CEED_EVAL_NONE);
@@ -215,7 +300,7 @@ if(1) { //HACK TEST  to use IC to look at GL view of coordinates
 //END HACK TEST
 
 // The ifunction I have not made it too yet because qdata is garbage
-  CeedQFunctionCreateInterior(ceed, 1, ifunction, ifunction_loc, &qf_ifunction);
+  CeedQFunctionCreateInterior(ceed, 1, IFunction_Advection, IFunction_Advection_loc, &qf_ifunction);
   CeedQFunctionAddInput(qf_ifunction, "qdata", qdatasize, CEED_EVAL_NONE);
   CeedQFunctionAddInput(qf_ifunction, "qdot", 5, CEED_EVAL_INTERP);
   CeedQFunctionAddInput(qf_ifunction, "q", 5, CEED_EVAL_INTERP);
