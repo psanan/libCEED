@@ -46,14 +46,7 @@
 CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
                              const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
-//  if(1) {
-   const CeedScalar (*X)[Q] = (CeedScalar(*)[Q])in[0];
-   const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0];
-//  } else {
-//   const CeedScalar (*X)[Q] = (CeedScalar(*)[Q])in[0];
-//   const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0];
-//  }
-
+  const CeedScalar (*X)[Q] = (CeedScalar(*)[Q])in[0];
   // Outputs
   CeedScalar (*q0)[Q] = (CeedScalar(*)[Q])out[0],
              (*coords)[Q] = (CeedScalar(*)[Q])out[1];
@@ -74,32 +67,9 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
   for (CeedInt i=0; i<Q; i++) {
     // Setup
     // -- Coordinates
-    CeedScalar x = X[0][i];
-    CeedScalar y = X[1][i];
-    CeedScalar z = X[2][i];
-   
-    if(1) {   // keeping this around for a while as it is an optional way for debugging Jacobians when setup was broken on inputs order
-    } else {
-      const CeedScalar J11 = J[0][0][i];
-      const CeedScalar J21 = J[0][1][i];
-      const CeedScalar J31 = J[0][2][i];
-      const CeedScalar J12 = J[1][0][i];
-      const CeedScalar J22 = J[1][1][i];
-      const CeedScalar J32 = J[1][2][i];
-      const CeedScalar J13 = J[2][0][i];
-      const CeedScalar J23 = J[2][1][i];
-      const CeedScalar J33 = J[2][2][i];
-    const CeedScalar A11 = J22*J33 - J23*J32;
-    const CeedScalar A12 = J13*J32 - J12*J33;
-    const CeedScalar A13 = J12*J23 - J13*J22;
-    const CeedScalar A21 = J23*J31 - J21*J33;
-    const CeedScalar A22 = J11*J33 - J13*J31;
-    const CeedScalar A23 = J13*J21 - J11*J23;
-    const CeedScalar A31 = J21*J32 - J22*J31;
-    const CeedScalar A32 = J12*J31 - J11*J32;
-    const CeedScalar A33 = J11*J22 - J12*J21;
-    const CeedScalar detJ = J11*A11 + J21*A12 + J31*A13;
-    }
+    const CeedScalar x = X[0][i];
+    const CeedScalar y = X[1][i];
+    const CeedScalar z = X[2][i];
     // -- Energy
     CeedScalar r ;
     CeedInt dimBubble=2; // 3 is a sphere, 2 is a cylinder
