@@ -71,10 +71,6 @@
       int nenl, iel, lelCat, lcsyst, iorder;
       int mattyp, ndofl, nsymdl, npro, ngauss, nppro;
 //      npro = propar.npro; 
-      double qfp[5*numnp]; // libCeed will get this array with scalar thrown into the temperature slot since advection works that way later we will need to make a real scalar equation. 
-      double qdotfp[5*numnp];
-      double q0[5*numnp]; // just for debugging using ics
-      double x0[3*numnp]; // just for debugging using ics
 // DEBUG
       int i,j,k,l,m;
 
@@ -133,6 +129,11 @@
         double y[numnp*nsd];
         double ac[numnp*nsd];
         double rest[numnp*nsd];
+
+      double qfp[5*numnp]; // libCeed will get this array with scalar thrown into the temperature slot since advection works that way later we will need to make a real scalar equation. 
+      double qdotfp[5*numnp];
+      double q0[5*numnp]; // just for debugging using ics
+      double x0[3*numnp]; // just for debugging using ics
         
 // solution not needed yet
 //        fscanf(fp,"%d",&numnp);
@@ -281,12 +282,20 @@ if(1) { //HACK TEST  to use IC to look at GL view of coordinates
 
   CeedBasisCreateTensorH1Lagrange(ceed, 3, 3, 2, Q, CEED_GAUSS_LOBATTO, &basisxc); 
   CeedQFunctionCreateInterior(ceed, 1, ICsAdvection, ICsAdvection_loc, &qf_ics);
-  CeedQFunctionAddInput(qf_ics, "x", 3, CEED_EVAL_INTERP); //K comments on this are in SetField Below
+  if(1) {
+    CeedQFunctionAddInput(qf_ics, "x", 3, CEED_EVAL_INTERP); //K comments on this are in SetField Below
+  } else {
+    CeedQFunctionAddInput(qf_ics, "x", nsd*nsd, CEED_EVAL_GRAD); //K comments on this are in SetField Below
+  }
   CeedQFunctionAddOutput(qf_ics, "q0", 5, CEED_EVAL_NONE);
   CeedQFunctionAddOutput(qf_ics, "coords", 3, CEED_EVAL_NONE);
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
   CeedOperatorCreate(ceed, qf_ics, NULL, NULL, &op_ics);
-  CeedOperatorSetField(op_ics, "x", restrictx, CEED_NOTRANSPOSE, basisxc, CEED_VECTOR_ACTIVE);
+  if(0) { // change to zer to get coordinates of the quadrature points instead of element nodes (also for metrics at q pt if changed above)
+    CeedOperatorSetField(op_ics, "x", restrictx, CEED_NOTRANSPOSE, basisxc, CEED_VECTOR_ACTIVE);
+  } else { 
+    CeedOperatorSetField(op_ics, "x", restrictx, CEED_NOTRANSPOSE, bx, CEED_VECTOR_ACTIVE);
+  }
   CeedOperatorSetField(op_ics, "q0", restrictq, CEED_TRANSPOSE, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 //  CeedElemRestrictionCreateIdentity(ceed, npro, qpownsd, qpownsd*npro, nsd, &restrictxcoord);  WRONG  they assemble nodes on top of each other back to an Lvector....just use restricxtx   FOR THIS CASE wher P=2 for borh solution AND coorinates
   CeedOperatorSetField(op_ics, "coords", restrictx, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, xceed);
