@@ -78,7 +78,7 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
     CeedScalar y = X[1][i];
     CeedScalar z = X[2][i];
    
-    if(1) {
+    if(1) {   // keeping this around for a while as it is an optional way for debugging Jacobians when setup was broken on inputs order
     } else {
       const CeedScalar J11 = J[0][0][i];
       const CeedScalar J21 = J[0][1][i];
@@ -89,9 +89,16 @@ CEED_QFUNCTION(ICsAdvection)(void *ctx, CeedInt Q,
       const CeedScalar J13 = J[2][0][i];
       const CeedScalar J23 = J[2][1][i];
       const CeedScalar J33 = J[2][2][i];
-      x = J11; //X[0][i];
-      y = J11; //X[1][i];
-      z = J11; //X[2][i];
+    const CeedScalar A11 = J22*J33 - J23*J32;
+    const CeedScalar A12 = J13*J32 - J12*J33;
+    const CeedScalar A13 = J12*J23 - J13*J22;
+    const CeedScalar A21 = J23*J31 - J21*J33;
+    const CeedScalar A22 = J11*J33 - J13*J31;
+    const CeedScalar A23 = J13*J21 - J11*J23;
+    const CeedScalar A31 = J21*J32 - J22*J31;
+    const CeedScalar A32 = J12*J31 - J11*J32;
+    const CeedScalar A33 = J11*J22 - J12*J21;
+    const CeedScalar detJ = J11*A11 + J21*A12 + J31*A13;
     }
     // -- Energy
     CeedScalar r ;

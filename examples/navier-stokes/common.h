@@ -60,8 +60,14 @@
 CEED_QFUNCTION(Setup)(void *ctx, CeedInt Q,
                       const CeedScalar *const *in, CeedScalar *const *out) {
   // Inputs
+//#ifdef nothere
   const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0],
                    (*w) = in[1];
+//#else   // uncomment 63 and 66-70 and don't pass weight to see that weight is corrupting Jacobian
+//  const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0]; 
+//  CeedScalar w[Q];
+//  for (CeedInt i=0; i<Q; i++) w[i]=1;
+//#endif
   // Outputs
   CeedScalar (*qdata)[Q] = (CeedScalar(*)[Q])out[0];
 

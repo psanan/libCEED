@@ -234,9 +234,9 @@
   }
 // jiggle the coordinates with a shift scaling off their node number to "encode" node number 
   for (CeedInt j=0; j<numnp; j++) {
-      x[j]+=0.0001*j;
-      x[j+numnp]+=0.0001*j;
-      x[j+numnp*2]+=0.0001*j;
+      x[j]+=0.000001*j;
+      x[j+numnp]+=0.000001*j;
+      x[j+numnp*2]+=0.000001*j;
    }
   CeedVectorCreate(ceed, numnp*3, &X); //ns757
   CeedVectorSetArray(X, CEED_MEM_HOST, CEED_USE_POINTER, x); // the jiggled  coordinates will go INTO IC and solution
@@ -250,17 +250,29 @@
   CeedElemRestrictionCreate(ceed, npro, nshl, nshg, 5, CEED_MEM_HOST, CEED_USE_POINTER, indx, &restrictq); // solution: change to indq if HO
   CeedElemRestrictionCreateIdentity(ceed, npro, qpownsd, qpownsd*npro, qdatasize, &restrictqdi); //metrics shared from setup to residual
   CeedElemRestrictionCreateIdentity(ceed, npro, qpownsd, qpownsd*npro, 1, &restrictxi); // weight
+//CeedElemRestrictionCreateIdentity(ceed, localNelem, numQdim,
+//                                                         localNelem*numQdim, 1,
+//                                                                        &restrictxi); //K G_xi    3 lines from nsplex.c
+
 //! [QFunction Create]
   CeedQFunctionCreateInterior(ceed, 1, Setup, Setup_loc, &qf_setup);
-  CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT);
   CeedQFunctionAddInput(qf_setup, "dx", nsd*nsd, CEED_EVAL_GRAD);
+  if (1) { // for debugging I removed weight from argument list to prove that it was the issue...then it became clear that it was my swapped order that corrupted
+  CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT);
+//CeedQFunctionAddInput(qf_setup, "weight", 1, CEED_EVAL_WEIGHT); line 782 in nsplex
+  }
   CeedQFunctionAddOutput(qf_setup, "qdata", qdatasize, CEED_EVAL_NONE);
   // Create the operator that builds the quadrature data for the NS operator
   CeedOperatorCreate(ceed, qf_setup, NULL, NULL, &op_setup);
   CeedOperatorSetField(op_setup, "dx", restrictx, CEED_NOTRANSPOSE, //K AddInput says gradient using basisx of operatorApply defined from xcorners
                        bx, CEED_VECTOR_ACTIVE);
+  if (1) { // other part of removing it. 
   CeedOperatorSetField(op_setup, "weight", restrictxi, CEED_NOTRANSPOSE, //K get the weight to setup Q function 
                        bx, CEED_VECTOR_NONE);
+//CeedOperatorSetField(op_setup, "weight", restrictxi, CEED_NOTRANSPOSE, //K get the weight to setup Q function 
+//                 basisx, CEED_VECTOR_NONE);  // 2 lines from nsplex.c
+
+  }
   CeedOperatorSetField(op_setup, "qdata", restrictqdi, CEED_NOTRANSPOSE,//K output of setup Q function metric data at quadrature points to share with op
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   CeedVectorCreate(ceed, qdatasize*npro*qpownsd, &qdata);
@@ -282,7 +294,7 @@ if(1) { //HACK TEST  to use IC to look at GL view of coordinates
 
   CeedBasisCreateTensorH1Lagrange(ceed, 3, 3, 2, Q, CEED_GAUSS_LOBATTO, &basisxc); 
   CeedQFunctionCreateInterior(ceed, 1, ICsAdvection, ICsAdvection_loc, &qf_ics);
-  if(1) {
+  if(1) { // a 0 sends gradient to ICS. needs a same switch in ICS to receive J . 
     CeedQFunctionAddInput(qf_ics, "x", 3, CEED_EVAL_INTERP); //K comments on this are in SetField Below
   } else {
     CeedQFunctionAddInput(qf_ics, "x", nsd*nsd, CEED_EVAL_GRAD); //K comments on this are in SetField Below
@@ -291,7 +303,7 @@ if(1) { //HACK TEST  to use IC to look at GL view of coordinates
   CeedQFunctionAddOutput(qf_ics, "coords", 3, CEED_EVAL_NONE);
   CeedQFunctionSetContext(qf_ics, &ctxSetup, sizeof ctxSetup);
   CeedOperatorCreate(ceed, qf_ics, NULL, NULL, &op_ics);
-  if(0) { // change to zer to get coordinates of the quadrature points instead of element nodes (also for metrics at q pt if changed above)
+  if(1) { // change to zero to get coordinates of the quadrature points instead of element nodes (also for metrics at q pt if changed above)
     CeedOperatorSetField(op_ics, "x", restrictx, CEED_NOTRANSPOSE, basisxc, CEED_VECTOR_ACTIVE);
   } else { 
     CeedOperatorSetField(op_ics, "x", restrictx, CEED_NOTRANSPOSE, bx, CEED_VECTOR_ACTIVE);
