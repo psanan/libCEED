@@ -19,11 +19,11 @@
 
 namespace ceed {
   namespace occa {
-    static ::occa::memory arrayToMemory(CeedScalar *array) {
+    ::occa::memory arrayToMemory(CeedScalar *array) {
       return ::occa::memory((::occa::modeMemory_t*) array);
     }
 
-    static CeedScalar* memoryToArray(::occa::memory &memory) {
+    CeedScalar* memoryToArray(::occa::memory &memory) {
       return (CeedScalar*) memory.getModeMemory();
     }
 

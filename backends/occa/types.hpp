@@ -44,11 +44,6 @@ namespace ceed {
       static Context* from(Ceed ceed);
     };
 
-    typedef struct {
-      const CeedScalar *inputs[16];
-      CeedScalar *outputs[16];
-    } QFunctionFields;
-
     typedef enum {
       HOST_SYNC,
       DEVICE_SYNC,

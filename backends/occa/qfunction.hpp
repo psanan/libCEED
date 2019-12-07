@@ -28,14 +28,13 @@ namespace ceed {
       Ceed ceed;
       CeedInt ceedInputFields;
       CeedInt ceedOutputFields;
-      size_t ceedContextSize;
-      void *ceedContext;
+      std::vector<CeedInt> ceedInputFieldSizes;
+      std::vector<CeedInt> ceedOutputFieldSizes;
 
       // Owned resources
       std::string filename;
-      std::string kernelName;
+      std::string qFunctionName;
       ::occa::kernel qFunctionKernel;
-      ::occa::memory context;
 
       QFunction(::occa::device device,
                 const std::string &source);
@@ -46,9 +45,9 @@ namespace ceed {
 
       ::occa::device getDevice();
 
-      int buildKernel();
-
-      int syncContext();
+      int buildKernel(const CeedInt Q);
+      std::string getKernelSource(const std::string &kernelName,
+                                  const CeedInt Q);
 
       int apply(CeedInt Q, CeedVector *U, CeedVector *V);
 

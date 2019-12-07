@@ -22,6 +22,9 @@
 
 namespace ceed {
   namespace occa {
+    ::occa::memory arrayToMemory(CeedScalar *array);
+    CeedScalar* memoryToArray(::occa::memory &memory);
+
     class Vector {
      public:
       // Ceed object information
