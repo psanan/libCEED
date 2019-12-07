@@ -31,9 +31,13 @@ namespace ceed {
         ceedOperatorOutputFields(NULL),
         ceedQFunctionInputFields(NULL),
         ceedQFunctionOutputFields(NULL),
-        isInitialized(false) {}
+        isInitialized(false) {
+      std::cout << "operator: Operator\n";
+    }
 
     Operator::~Operator() {
+      std::cout << "operator: ~Operator\n";
+
       for (int i = 0; i < (int) eVectors.size(); ++i) {
         delete eVectors[i];
       }
@@ -43,6 +47,8 @@ namespace ceed {
     }
 
     Operator* Operator::from(CeedOperator op) {
+      std::cout << "operator: from\n";
+
       int ierr;
       Operator *operator_;
       CeedQFunction qf;
@@ -75,6 +81,8 @@ namespace ceed {
     }
 
     ::occa::device Operator::getDevice() {
+      std::cout << "operator: getDevice\n";
+
       // if (qFunctionKernel.isInitialized()) {
       //   return qFunctionKernel.getDevice();
       // }
@@ -82,6 +90,8 @@ namespace ceed {
     }
 
     int Operator::setup() {
+      std::cout << "operator: setup\n";
+
       int ierr;
 
       const CeedInt fieldCount = ceedInputFieldCount + ceedOutputFieldCount;
@@ -121,6 +131,8 @@ namespace ceed {
                                VectorVector_t qVectors,
                                CeedOperatorField *operatorFields,
                                CeedQFunctionField *qFunctionFields) {
+      std::cout << "operator: setupVectors\n";
+
       int ierr;
       for (CeedInt i = 0; i < fieldCount; ++i) {
         CeedOperatorField operatorField = operatorFields[i];
@@ -203,6 +215,8 @@ namespace ceed {
     }
 
     int Operator::apply(Vector &in, Vector &out, CeedRequest *request) {
+      std::cout << "operator: apply\n";
+
       if (!isInitialized) {
         setup();
       }
@@ -213,10 +227,14 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int Operator::registerOperatorFunction(Ceed ceed, CeedOperator op,
                                            const char *fname, ceed::occa::ceedFunction f) {
+      std::cout << "operator: registerOperatorFunction\n";
+
       return CeedSetBackendFunction(ceed, "Operator", op, fname, f);
     }
 
     int Operator::ceedCreate(CeedOperator op) {
+      std::cout << "operator: ceedCreate\n";
+
       // Based on cuda-gen
       int ierr;
 
@@ -239,6 +257,8 @@ namespace ceed {
 
     int Operator::ceedApply(CeedOperator op,
                             CeedVector invec, CeedVector outvec, CeedRequest *request) {
+      std::cout << "operator: ceedApply\n";
+
       Operator *operator_ = Operator::from(op);
       Vector *in = Vector::from(invec);
       Vector *out = Vector::from(outvec);
@@ -257,6 +277,8 @@ namespace ceed {
     }
 
     int Operator::ceedDestroy(CeedOperator op) {
+      std::cout << "operator: ceedDestroy\n";
+
       delete Operator::from(op);
       return 0;
     }

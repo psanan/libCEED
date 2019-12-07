@@ -27,17 +27,20 @@ namespace ceed {
         ceedOutputFields(0),
         ceedContextSize(0),
         ceedContext(NULL) {
+      std::cout << "qfunction: QFunction\n";
       const size_t colonIndex = source.find(':');
       filename = source.substr(0, colonIndex);
       kernelName = source.substr(colonIndex + 1);
     }
 
     QFunction::~QFunction() {
+      std::cout << "qfunction: ~QFunction\n";
       qFunctionKernel.free();
       context.free();
     }
 
     QFunction* QFunction::from(CeedQFunction qf) {
+      std::cout << "qfunction: from\n";
       int ierr;
       QFunction *qFunction;
 
@@ -58,6 +61,7 @@ namespace ceed {
     }
 
     ::occa::device QFunction::getDevice() {
+      std::cout << "qfunction: getDevice\n";
       if (qFunctionKernel.isInitialized()) {
         return qFunctionKernel.getDevice();
       }
@@ -65,14 +69,21 @@ namespace ceed {
     }
 
     int QFunction::buildKernel() {
+      std::cout << "qfunction: buildKernel\n";
       if (qFunctionKernel.isInitialized()) {
         return 0;
       }
+
       // TODO: Build kernel
+
+      std::cout << "qfunction: filename = " << filename << '\n'
+                << "kernelName = " << kernelName << '\n';
+
       return 0;
     }
 
     int QFunction::syncContext() {
+      std::cout << "qfunction: syncContext\n";
       if (ceedContextSize <= 0) {
         // TODO: context = occa::null;
         return 0;
@@ -87,6 +98,7 @@ namespace ceed {
     }
 
     int QFunction::apply(CeedInt Q, CeedVector *U, CeedVector *V) {
+      std::cout << "qfunction: apply\n";
       int ierr;
       ierr = buildKernel(); CeedChk(ierr);
       ierr = syncContext(); CeedChk(ierr);
@@ -128,10 +140,12 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int QFunction::registerQFunctionFunction(Ceed ceed, CeedQFunction qf,
                                              const char *fname, ceed::occa::ceedFunction f) {
+      std::cout << "qfunction: registerQFunctionFunction\n";
       return CeedSetBackendFunction(ceed, "QFunction", qf, fname, f);
     }
 
     int QFunction::ceedCreate(CeedQFunction qf) {
+      std::cout << "qfunction: ceedCreate\n";
       // Based on cuda-gen
       int ierr;
 
@@ -158,8 +172,10 @@ namespace ceed {
 
     int QFunction::ceedApply(CeedQFunction qf, CeedInt Q,
                              CeedVector *U, CeedVector *V) {
+      std::cout << "qfunction: ceedApply\n";
       QFunction *qFunction = QFunction::from(qf);
       if (qFunction) {
+        std::cout << "qfunction: from\n";
         return qFunction->apply(Q, U, V);
       }
 
@@ -167,6 +183,7 @@ namespace ceed {
     }
 
     int QFunction::ceedDestroy(CeedQFunction qf) {
+      std::cout << "qfunction: ceedDestroy\n";
       delete QFunction::from(qf);
       return 0;
     }

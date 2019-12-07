@@ -17,14 +17,20 @@ int main(int argc, char **argv) {
 
   CeedInit(argv[1], &ceed);
 
+  printf("HERE 1\n");
+
   CeedQFunctionCreateInterior(ceed, 1, setup, setup_loc, &qf_setup);
   CeedQFunctionAddInput(qf_setup, "w", 1, CEED_EVAL_WEIGHT);
   CeedQFunctionAddOutput(qf_setup, "qdata", 1, CEED_EVAL_NONE);
+
+  printf("HERE 2\n");
 
   CeedQFunctionCreateInterior(ceed, 1, mass, mass_loc, &qf_mass);
   CeedQFunctionAddInput(qf_mass, "qdata", 1, CEED_EVAL_NONE);
   CeedQFunctionAddInput(qf_mass, "u", 1, CEED_EVAL_INTERP);
   CeedQFunctionAddOutput(qf_mass, "v", 1, CEED_EVAL_INTERP);
+
+  printf("HERE 3\n");
 
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = 2.*i/(Q-1) - 1;
@@ -32,6 +38,8 @@ int main(int argc, char **argv) {
     u[i] = 2 + 3*x + 5*x*x;
     v[i] = w[i] * u[i];
   }
+
+  printf("HERE 4\n");
 
   CeedVectorCreate(ceed, Q, &W);
   CeedVectorSetArray(W, CEED_MEM_HOST, CEED_USE_POINTER, w);
@@ -42,11 +50,15 @@ int main(int argc, char **argv) {
   CeedVectorCreate(ceed, Q, &Qdata);
   CeedVectorSetValue(Qdata, 0);
 
+  printf("HERE 5\n");
+
   {
     in[0] = W;
     out[0] = Qdata;
     CeedQFunctionApply(qf_setup, Q, in, out);
   }
+
+  printf("HERE 6\n");
   {
     in[0] = W;
     in[1] = U;
@@ -54,12 +66,18 @@ int main(int argc, char **argv) {
     CeedQFunctionApply(qf_mass, Q, in, out);
   }
 
+  printf("HERE 7\n");
+
   CeedVectorGetArrayRead(V, CEED_MEM_HOST, &vv);
+
+  printf("HERE 8\n");
   for (CeedInt i=0; i<Q; i++)
     if (v[i] != vv[i])
       // LCOV_EXCL_START
       printf("[%d] v %f != vv %f\n",i, v[i], vv[i]);
   // LCOV_EXCL_STOP
+
+  printf("HERE 9\n");
   CeedVectorRestoreArrayRead(V, &vv);
 
   CeedVectorDestroy(&W);

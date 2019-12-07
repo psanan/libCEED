@@ -19,15 +19,21 @@
 
 namespace ceed {
   namespace occa {
-    SimplexBasis::SimplexBasis() {}
+    SimplexBasis::SimplexBasis() {
+      std::cout << "simplex-basis: SimplexBasis\n";
+    }
 
-    SimplexBasis::~SimplexBasis() {}
+    SimplexBasis::~SimplexBasis() {
+      std::cout << "simplex-basis: ~SimplexBasis\n";
+    }
 
     int SimplexBasis::apply(const CeedInt elementCount,
                             CeedTransposeMode tmode,
                             CeedEvalMode emode,
                             Vector *u,
                             Vector *v) {
+      std::cout << "simplex-basis: apply\n";
+
       return 0;
     }
 
@@ -39,6 +45,8 @@ namespace ceed {
                                  const CeedScalar *qref,
                                  const CeedScalar *qweight,
                                  CeedBasis basis) {
+      std::cout << "simplex-basis: ceedCreate\n";
+
       // Based on cuda-ref
       int ierr;
 

@@ -46,6 +46,8 @@ namespace ceed {
         dim(dim_),
         P1D(P1D_),
         Q1D(Q1D_) {
+      std::cout << "tensor-basis: TensorBasis\n";
+
       setCeedFields(basis);
 
       ::occa::device device = getDevice();
@@ -62,6 +64,8 @@ namespace ceed {
     }
 
     TensorBasis::~TensorBasis() {
+      std::cout << "tensor-basis: ~TensorBasis\n";
+
       interpKernelBuilder.free();
       gradKernelBuilder.free();
       weightKernelBuilder.free();
@@ -71,10 +75,14 @@ namespace ceed {
     }
 
     ::occa::device TensorBasis::getDevice() {
+      std::cout << "tensor-basis: getDevice\n";
+
       return Context::from(ceed)->device;
     }
 
     void TensorBasis::setupKernelBuilders() {
+      std::cout << "tensor-basis: setupKernelBuilders\n";
+
       const char *cpuKernelSources[3] = {
         tensorBasis1D_cpu_source,
         tensorBasis2D_cpu_source,
@@ -114,6 +122,8 @@ namespace ceed {
                                  const bool transpose,
                                  Vector &U,
                                  Vector &V) {
+      std::cout << "tensor-basis: applyInterp\n";
+
       ::occa::kernel interp = (
         usingGPU
         ? getGpuInterpKernel(transpose)
@@ -129,11 +139,15 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuInterpKernel(const bool transpose) {
+      std::cout << "tensor-basis: getCpuInterpKernel\n";
+
       return buildCpuEvalKernel(interpKernelBuilder,
                                 transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuInterpKernel(const bool transpose) {
+      std::cout << "tensor-basis: getGpuInterpKernel\n";
+
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -162,6 +176,8 @@ namespace ceed {
                                const bool transpose,
                                Vector &U,
                                Vector &V) {
+      std::cout << "tensor-basis: applyGrad\n";
+
       ::occa::kernel grad = (
         usingGPU
         ? getGpuGradKernel(transpose)
@@ -177,11 +193,15 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuGradKernel(const bool transpose) {
+      std::cout << "tensor-basis: getCpuGradKernel\n";
+
       return buildCpuEvalKernel(gradKernelBuilder,
                                 transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuGradKernel(const bool transpose) {
+      std::cout << "tensor-basis: getGpuGradKernel\n";
+
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -208,6 +228,8 @@ namespace ceed {
 
     int TensorBasis::applyWeight(const CeedInt elementCount,
                                  Vector &W) {
+      std::cout << "tensor-basis: applyWeight\n";
+
       ::occa::kernel weight = (
         usingGPU
         ? getGpuWeightKernel()
@@ -220,11 +242,15 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuWeightKernel() {
+      std::cout << "tensor-basis: getCpuWeightKernel\n";
+
       return buildCpuEvalKernel(weightKernelBuilder,
                                 false);
     }
 
     ::occa::kernel TensorBasis::getGpuWeightKernel() {
+      std::cout << "tensor-basis: getGpuWeightKernel\n";
+
       int elementsPerBlock;
       if (dim == 1) {
         elementsPerBlock = 32 / Q1D;
@@ -246,6 +272,8 @@ namespace ceed {
 
     ::occa::kernel TensorBasis::buildCpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
                                                    const bool transpose) {
+      std::cout << "tensor-basis: buildCpuEvalKernel\n";
+
       ::occa::properties kernelProps;
       kernelProps["defines/TRANSPOSE"] = transpose;
 
@@ -256,6 +284,8 @@ namespace ceed {
                                                    const bool transpose,
                                                    const int elementsPerBlock,
                                                    const int sharedBufferSize) {
+      std::cout << "tensor-basis: buildGpuEvalKernel\n";
+
 
       ::occa::properties kernelProps;
       kernelProps["defines/TRANSPOSE"]          = transpose;
@@ -270,6 +300,8 @@ namespace ceed {
                            CeedEvalMode emode,
                            Vector *U,
                            Vector *V) {
+      std::cout << "tensor-basis: apply\n";
+
       const bool transpose = tmode == CEED_TRANSPOSE;
 
       if ((dim < 1) || (3 < dim)) {
@@ -317,6 +349,8 @@ namespace ceed {
                                 const CeedScalar *qref1D,
                                 const CeedScalar *qWeight1D,
                                 CeedBasis basis) {
+      std::cout << "tensor-basis: ceedCreate\n";
+
       // Based on cuda-shared
       if (Q1D < P1D) {
         return CeedError(

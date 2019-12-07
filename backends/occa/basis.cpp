@@ -25,11 +25,17 @@ namespace ceed {
         ceedDim(0),
         ceedQuadraturePointCount(0),
         ceedNodeCount(0),
-        ceedComponentCount(0) {}
+        ceedComponentCount(0) {
+      std::cout << "basis: Basis\n";
+    }
 
-    Basis::~Basis() {}
+    Basis::~Basis() {
+      std::cout << "basis: ~Basis\n";
+    }
 
     Basis* Basis::from(CeedBasis basis) {
+      std::cout << "basis: from\n";
+
       int ierr;
       Basis *basis_;
 
@@ -40,6 +46,8 @@ namespace ceed {
     }
 
     Basis* Basis::from(CeedOperatorField operatorField) {
+      std::cout << "basis: from\n";
+
       int ierr;
       CeedBasis basis;
       ierr = CeedOperatorFieldGetBasis(operatorField, &basis); CeedOccaFromChk(ierr);
@@ -47,6 +55,8 @@ namespace ceed {
     }
 
     int Basis::setCeedFields(CeedBasis basis) {
+      std::cout << "basis: setCeedFields\n";
+
       int ierr;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
       ierr = CeedBasisGetDimension(basis, &ceedDim); CeedChk(ierr);
@@ -64,18 +74,24 @@ namespace ceed {
     }
 
     ::occa::device Basis::getDevice() {
+      std::cout << "basis: getDevice\n";
+
       return Context::from(ceed)->device;
     }
 
     //---[ Ceed Callbacks ]-----------
     int Basis::registerBasisFunction(Ceed ceed, CeedBasis basis,
                                      const char *fname, ceed::occa::ceedFunction f) {
+      std::cout << "basis: registerBasisFunction\n";
+
       return CeedSetBackendFunction(ceed, "Basis", basis, fname, f);
     }
 
     int Basis::ceedApply(CeedBasis basis, const CeedInt nelem,
                          CeedTransposeMode tmode,
                          CeedEvalMode emode, CeedVector u, CeedVector v) {
+      std::cout << "basis: ceedApply\n";
+
       Basis *basis_ = Basis::from(basis);
       Vector *uVector = u ? Vector::from(u) : NULL;
       Vector *vVector = v ? Vector::from(v) : NULL;
@@ -94,6 +110,8 @@ namespace ceed {
     }
 
     int Basis::ceedDestroy(CeedBasis basis) {
+      std::cout << "basis: ceedDestroy\n";
+
       delete Basis::from(basis);
       return 0;
     }
