@@ -25,15 +25,15 @@ namespace ceed {
         ceedElementSize(0),
         ceedComponentCount(0),
         ceedBlockSize(0) {
-      std::cout << "elem-restriction: ElemRestriction\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ElemRestriction");
     }
 
     ElemRestriction::~ElemRestriction() {
-      std::cout << "elem-restriction: ~ElemRestriction\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ~ElemRestriction");
     }
 
     ElemRestriction* ElemRestriction::from(CeedElemRestriction r) {
-      std::cout << "elem-restriction: from\n";
+      OCCA_DEBUG_TRACE("elem-restriction: from");
 
       int ierr;
       ElemRestriction *elemRestriction;
@@ -57,7 +57,7 @@ namespace ceed {
     }
 
     ElemRestriction* ElemRestriction::from(CeedOperatorField operatorField) {
-      std::cout << "elem-restriction: from\n";
+      OCCA_DEBUG_TRACE("elem-restriction: from");
 
       int ierr;
       CeedElemRestriction ceedElemRestriction;
@@ -69,14 +69,14 @@ namespace ceed {
     }
 
     ::occa::device ElemRestriction::getDevice() {
-      std::cout << "elem-restriction: getDevice\n";
+      OCCA_DEBUG_TRACE("elem-restriction: getDevice");
 
       return Context::from(ceed)->device;
     }
 
     int ElemRestriction::apply(CeedTransposeMode tmode, CeedTransposeMode lmode,
                                Vector &u, Vector &v, CeedRequest *request) {
-      std::cout << "elem-restriction: apply\n";
+      OCCA_DEBUG_TRACE("elem-restriction: apply");
 
       // TODO: Implement
       return 0;
@@ -85,7 +85,7 @@ namespace ceed {
     int ElemRestriction::applyBlock(CeedInt block,
                                     CeedTransposeMode tmode, CeedTransposeMode lmode,
                                     Vector &u, Vector &v, CeedRequest *request) {
-      std::cout << "elem-restriction: applyBlock\n";
+      OCCA_DEBUG_TRACE("elem-restriction: applyBlock");
 
       // TODO: Implement
       return 0;
@@ -94,13 +94,13 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int ElemRestriction::registerRestrictionFunction(Ceed ceed, CeedElemRestriction r,
                                                      const char *fname, ceed::occa::ceedFunction f) {
-      std::cout << "elem-restriction: registerRestrictionFunction\n";
+      OCCA_DEBUG_TRACE("elem-restriction: registerRestrictionFunction");
 
       return CeedSetBackendFunction(ceed, "ElemRestriction", r, fname, f);
     }
 
     int ElemRestriction::ceedCreate(CeedElemRestriction r) {
-      std::cout << "elem-restriction: ceedCreate\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ceedCreate");
 
       // Based on cuda-reg
       int ierr;
@@ -129,7 +129,7 @@ namespace ceed {
     int ElemRestriction::ceedApply(CeedElemRestriction r,
                                    CeedTransposeMode tmode, CeedTransposeMode lmode,
                                    CeedVector u, CeedVector v, CeedRequest *request) {
-    std::cout << "elem-restriction: ceedApply\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ceedApply");
 
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
@@ -152,7 +152,7 @@ namespace ceed {
                                         CeedInt block,
                                         CeedTransposeMode tmode, CeedTransposeMode lmode,
                                         CeedVector u, CeedVector v, CeedRequest *request) {
-      std::cout << "elem-restriction: ceedApplyBlock\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ceedApplyBlock");
 
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
@@ -172,7 +172,7 @@ namespace ceed {
     }
 
     int ElemRestriction::ceedDestroy(CeedElemRestriction r) {
-      std::cout << "elem-restriction: ceedDestroy\n";
+      OCCA_DEBUG_TRACE("elem-restriction: ceedDestroy");
 
       delete ElemRestriction::from(r);
       return 0;

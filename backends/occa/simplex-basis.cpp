@@ -20,11 +20,11 @@
 namespace ceed {
   namespace occa {
     SimplexBasis::SimplexBasis() {
-      std::cout << "simplex-basis: SimplexBasis\n";
+      OCCA_DEBUG_TRACE("simplex-basis: SimplexBasis");
     }
 
     SimplexBasis::~SimplexBasis() {
-      std::cout << "simplex-basis: ~SimplexBasis\n";
+      OCCA_DEBUG_TRACE("simplex-basis: ~SimplexBasis");
     }
 
     int SimplexBasis::apply(const CeedInt elementCount,
@@ -32,7 +32,7 @@ namespace ceed {
                             CeedEvalMode emode,
                             Vector *u,
                             Vector *v) {
-      std::cout << "simplex-basis: apply\n";
+      OCCA_DEBUG_TRACE("simplex-basis: apply");
 
       return 0;
     }
@@ -45,7 +45,7 @@ namespace ceed {
                                  const CeedScalar *qref,
                                  const CeedScalar *qweight,
                                  CeedBasis basis) {
-      std::cout << "simplex-basis: ceedCreate\n";
+      OCCA_DEBUG_TRACE("simplex-basis: ceedCreate");
 
       // Based on cuda-ref
       int ierr;

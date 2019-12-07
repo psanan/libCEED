@@ -20,6 +20,8 @@
 #include <ceed-backend.h>
 #include <occa.hpp>
 
+#define OCCA_DEBUG_TRACE(str)
+
 #define CeedOccaFromChk(ierr)                   \
   do {                                          \
     if (ierr) {                                 \

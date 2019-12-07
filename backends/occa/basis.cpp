@@ -26,15 +26,15 @@ namespace ceed {
         ceedQuadraturePointCount(0),
         ceedNodeCount(0),
         ceedComponentCount(0) {
-      std::cout << "basis: Basis\n";
+      OCCA_DEBUG_TRACE("basis: Basis");
     }
 
     Basis::~Basis() {
-      std::cout << "basis: ~Basis\n";
+      OCCA_DEBUG_TRACE("basis: ~Basis");
     }
 
     Basis* Basis::from(CeedBasis basis) {
-      std::cout << "basis: from\n";
+      OCCA_DEBUG_TRACE("basis: from");
 
       int ierr;
       Basis *basis_;
@@ -46,7 +46,7 @@ namespace ceed {
     }
 
     Basis* Basis::from(CeedOperatorField operatorField) {
-      std::cout << "basis: from\n";
+      OCCA_DEBUG_TRACE("basis: from");
 
       int ierr;
       CeedBasis basis;
@@ -55,7 +55,7 @@ namespace ceed {
     }
 
     int Basis::setCeedFields(CeedBasis basis) {
-      std::cout << "basis: setCeedFields\n";
+      OCCA_DEBUG_TRACE("basis: setCeedFields");
 
       int ierr;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
@@ -74,7 +74,7 @@ namespace ceed {
     }
 
     ::occa::device Basis::getDevice() {
-      std::cout << "basis: getDevice\n";
+      OCCA_DEBUG_TRACE("basis: getDevice");
 
       return Context::from(ceed)->device;
     }
@@ -82,7 +82,7 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int Basis::registerBasisFunction(Ceed ceed, CeedBasis basis,
                                      const char *fname, ceed::occa::ceedFunction f) {
-      std::cout << "basis: registerBasisFunction\n";
+      OCCA_DEBUG_TRACE("basis: registerBasisFunction");
 
       return CeedSetBackendFunction(ceed, "Basis", basis, fname, f);
     }
@@ -90,7 +90,7 @@ namespace ceed {
     int Basis::ceedApply(CeedBasis basis, const CeedInt nelem,
                          CeedTransposeMode tmode,
                          CeedEvalMode emode, CeedVector u, CeedVector v) {
-      std::cout << "basis: ceedApply\n";
+      OCCA_DEBUG_TRACE("basis: ceedApply");
 
       Basis *basis_ = Basis::from(basis);
       Vector *uVector = u ? Vector::from(u) : NULL;
@@ -110,7 +110,7 @@ namespace ceed {
     }
 
     int Basis::ceedDestroy(CeedBasis basis) {
-      std::cout << "basis: ceedDestroy\n";
+      OCCA_DEBUG_TRACE("basis: ceedDestroy");
 
       delete Basis::from(basis);
       return 0;

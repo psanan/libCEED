@@ -21,15 +21,15 @@ namespace ceed {
   namespace occa {
     CompositeOperator::CompositeOperator() :
         ceed(NULL) {
-      std::cout << "composite-operator: CompositeOperator\n";
+      OCCA_DEBUG_TRACE("composite-operator: CompositeOperator");
     }
 
     CompositeOperator::~CompositeOperator() {
-      std::cout << "composite-operator: ~CompositeOperator\n";
+      OCCA_DEBUG_TRACE("composite-operator: ~CompositeOperator");
     }
 
     CompositeOperator* CompositeOperator::from(CeedOperator op) {
-      std::cout << "composite-operator: from\n";
+      OCCA_DEBUG_TRACE("composite-operator: from");
 
       int ierr;
       CompositeOperator *operator_;
@@ -50,7 +50,7 @@ namespace ceed {
     }
 
     int CompositeOperator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      std::cout << "composite-operator: apply\n";
+      OCCA_DEBUG_TRACE("composite-operator: apply");
 
       int ierr;
       const int operatorCount = (int) ceedOperators.size();
@@ -67,13 +67,13 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int CompositeOperator::registerOperatorFunction(Ceed ceed, CeedOperator op,
                                            const char *fname, ceed::occa::ceedFunction f) {
-      std::cout << "composite-operator: registerOperatorFunction\n";
+      OCCA_DEBUG_TRACE("composite-operator: registerOperatorFunction");
 
       return CeedSetBackendFunction(ceed, "Operator", op, fname, f);
     }
 
     int CompositeOperator::ceedCreate(CeedOperator op) {
-      std::cout << "composite-operator: ceedCreate\n";
+      OCCA_DEBUG_TRACE("composite-operator: ceedCreate");
 
 
       int ierr;
@@ -98,7 +98,7 @@ namespace ceed {
 
     int CompositeOperator::ceedApply(CeedOperator op,
                             CeedVector invec, CeedVector outvec, CeedRequest *request) {
-      std::cout << "composite-operator: ceedApply\n";
+      OCCA_DEBUG_TRACE("composite-operator: ceedApply");
 
       CompositeOperator *operator_ = CompositeOperator::from(op);
       Vector *in = Vector::from(invec);
@@ -118,7 +118,7 @@ namespace ceed {
     }
 
     int CompositeOperator::ceedDestroy(CeedOperator op) {
-      std::cout << "composite-operator: ceedDestroy\n";
+      OCCA_DEBUG_TRACE("composite-operator: ceedDestroy");
 
       delete CompositeOperator::from(op);
       return 0;
