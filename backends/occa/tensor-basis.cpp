@@ -17,9 +17,7 @@
 #include "tensor-basis.hpp"
 #include "kernels/tensor-basis.hpp"
 
-// CPU kernels are based on the work found in the ref backend
-
-// GPU kernels are based on the work found in the cuda-shared backend
+// Kernels are based on the cuda backend from LLNL and VT groups
 //
 // Expects the following types to be defined:
 // - CeedInt
@@ -351,7 +349,6 @@ namespace ceed {
                                 CeedBasis basis) {
       OCCA_DEBUG_TRACE("tensor-basis: ceedCreate");
 
-      // Based on cuda-shared
       if (Q1D < P1D) {
         return CeedError(
           NULL, 1,

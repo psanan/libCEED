@@ -41,12 +41,19 @@ namespace ceed {
     }
 
     Vector* Vector::from(CeedVector vec) {
-      int ierr;
-      Vector *vector;
+      if (!vec) {
+        return NULL;
+      }
 
+      int ierr;
+
+      Vector *vector = NULL;
       ierr = CeedVectorGetData(vec, (void**) &vector); CeedOccaFromChk(ierr);
-      ierr = CeedVectorGetCeed(vec, &vector->ceed); CeedOccaFromChk(ierr);
-      ierr = CeedVectorGetLength(vec, &vector->length); CeedOccaFromChk(ierr);
+
+      if (vector != NULL) {
+        ierr = CeedVectorGetCeed(vec, &vector->ceed); CeedOccaFromChk(ierr);
+        ierr = CeedVectorGetLength(vec, &vector->length); CeedOccaFromChk(ierr);
+      }
 
       return vector;
     }

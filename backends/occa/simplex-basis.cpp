@@ -47,9 +47,7 @@ namespace ceed {
                                  CeedBasis basis) {
       OCCA_DEBUG_TRACE("simplex-basis: ceedCreate");
 
-      // Based on cuda-ref
       int ierr;
-
       Ceed ceed;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
 

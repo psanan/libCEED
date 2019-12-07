@@ -34,6 +34,9 @@ namespace ceed {
 
     ElemRestriction* ElemRestriction::from(CeedElemRestriction r) {
       OCCA_DEBUG_TRACE("elem-restriction: from");
+      if (!r) {
+        return NULL;
+      }
 
       int ierr;
       ElemRestriction *elemRestriction;
@@ -102,9 +105,7 @@ namespace ceed {
     int ElemRestriction::ceedCreate(CeedElemRestriction r) {
       OCCA_DEBUG_TRACE("elem-restriction: ceedCreate");
 
-      // Based on cuda-reg
       int ierr;
-
       Ceed ceed;
       ierr = CeedElemRestrictionGetCeed(r, &ceed); CeedChk(ierr);
 

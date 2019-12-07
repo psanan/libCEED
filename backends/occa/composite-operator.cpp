@@ -30,6 +30,9 @@ namespace ceed {
 
     CompositeOperator* CompositeOperator::from(CeedOperator op) {
       OCCA_DEBUG_TRACE("composite-operator: from");
+      if (!op) {
+        return NULL;
+      }
 
       int ierr;
       CompositeOperator *operator_;

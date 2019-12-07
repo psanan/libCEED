@@ -35,6 +35,9 @@ namespace ceed {
 
     Basis* Basis::from(CeedBasis basis) {
       OCCA_DEBUG_TRACE("basis: from");
+      if (!basis) {
+        return NULL;
+      }
 
       int ierr;
       Basis *basis_;
@@ -93,20 +96,16 @@ namespace ceed {
       OCCA_DEBUG_TRACE("basis: ceedApply");
 
       Basis *basis_ = Basis::from(basis);
-      Vector *uVector = u ? Vector::from(u) : NULL;
-      Vector *vVector = v ? Vector::from(v) : NULL;
 
       if (!basis_) {
         return CeedError(NULL, 1, "Incorrect CeedBasis argument: op");
       }
-      if (u && !uVector) {
-        return CeedError(basis_->ceed, 1, "Incorrect CeedVector argument: u");
-      }
-      if (v && !vVector) {
-        return CeedError(basis_->ceed, 1, "Incorrect CeedVector argument: v");
-      }
 
-      return basis_->apply(nelem, tmode, emode, uVector, vVector);
+      return basis_->apply(
+        nelem,
+        tmode, emode,
+        Vector::from(u), Vector::from(v)
+      );
     }
 
     int Basis::ceedDestroy(CeedBasis basis) {

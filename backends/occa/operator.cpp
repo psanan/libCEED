@@ -48,6 +48,9 @@ namespace ceed {
 
     Operator* Operator::from(CeedOperator op) {
       OCCA_DEBUG_TRACE("operator: from");
+      if (!op) {
+        return NULL;
+      }
 
       int ierr;
       Operator *operator_;
@@ -235,9 +238,7 @@ namespace ceed {
     int Operator::ceedCreate(CeedOperator op) {
       OCCA_DEBUG_TRACE("operator: ceedCreate");
 
-      // Based on cuda-gen
       int ierr;
-
       Ceed ceed;
       ierr = CeedOperatorGetCeed(op, &ceed); CeedChk(ierr);
 

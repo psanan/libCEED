@@ -40,6 +40,10 @@ namespace ceed {
 
     QFunction* QFunction::from(CeedQFunction qf) {
       OCCA_DEBUG_TRACE("qfunction: from");
+      if (!qf) {
+        return NULL;
+      }
+
       int ierr;
       QFunction *qFunction;
 
@@ -258,9 +262,8 @@ namespace ceed {
 
     int QFunction::ceedCreate(CeedQFunction qf) {
       OCCA_DEBUG_TRACE("qfunction: ceedCreate");
-      // Based on cuda-gen
-      int ierr;
 
+      int ierr;
       Ceed ceed;
       ierr = CeedQFunctionGetCeed(qf, &ceed); CeedChk(ierr);
       Context *context;
