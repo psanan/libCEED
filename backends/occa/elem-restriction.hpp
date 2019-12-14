@@ -29,14 +29,32 @@ namespace ceed {
       Ceed ceed;
       CeedInt ceedElementCount;
       CeedInt ceedElementSize;
+      CeedInt ceedNodeCount;
       CeedInt ceedComponentCount;
       CeedInt ceedBlockSize;
 
+      // Passed resources
+      bool freeHostIndices;
+      CeedInt *hostIndices;
+
       // Owned resources
+      bool freeIndices;
+      ::occa::memory indices;
+      ::occa::memory transposeOffsets;
+      ::occa::memory transposeIndices;
 
       ElemRestriction();
 
       ~ElemRestriction();
+
+      void setupFromHostMemory(CeedCopyMode copyMode,
+                               const CeedInt *indices_h);
+
+      void setupFromDeviceMemory(CeedCopyMode copyMode,
+                                 const CeedInt *indices_d);
+
+      void setupTransposeIndices();
+      void setupTransposeIndices(const CeedInt *indices_h);
 
       static ElemRestriction* from(CeedElemRestriction r);
       static ElemRestriction* from(CeedOperatorField operatorField);
@@ -54,7 +72,10 @@ namespace ceed {
       static int registerRestrictionFunction(Ceed ceed, CeedElemRestriction r,
                                              const char *fname, ceed::occa::ceedFunction f);
 
-      static int ceedCreate(CeedElemRestriction r);
+      static int ceedCreate(CeedMemType memType,
+                            CeedCopyMode copyMode,
+                            const CeedInt *indices,
+                            CeedElemRestriction r);
 
       static int ceedApply(CeedElemRestriction r,
                            CeedTransposeMode tmode, CeedTransposeMode lmode,

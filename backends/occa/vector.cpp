@@ -20,7 +20,10 @@
 namespace ceed {
   namespace occa {
     ::occa::memory arrayToMemory(CeedScalar *array) {
-      return ::occa::memory((::occa::modeMemory_t*) array);
+      if (array) {
+        return ::occa::memory((::occa::modeMemory_t*) array);
+      }
+      return ::occa::memory();
     }
 
     CeedScalar* memoryToArray(::occa::memory &memory) {

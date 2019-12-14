@@ -15,6 +15,7 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "elem-restriction.hpp"
+#include "vector.hpp"
 
 
 namespace ceed {
@@ -23,13 +24,106 @@ namespace ceed {
         ceed(NULL),
         ceedElementCount(0),
         ceedElementSize(0),
+        ceedNodeCount(0),
         ceedComponentCount(0),
-        ceedBlockSize(0) {
-      OCCA_DEBUG_TRACE("elem-restriction: ElemRestriction");
-    }
+        ceedBlockSize(0),
+        freeHostIndices(true),
+        hostIndices(NULL),
+        freeIndices(true) {}
 
     ElemRestriction::~ElemRestriction() {
       OCCA_DEBUG_TRACE("elem-restriction: ~ElemRestriction");
+      if (freeHostIndices) {
+        CeedFree(&hostIndices);
+      }
+
+      if (freeIndices) {
+        indices.free();
+      }
+      transposeOffsets.free();
+      transposeIndices.free();
+    }
+
+    void ElemRestriction::setupFromHostMemory(CeedCopyMode copyMode,
+                                              const CeedInt *indices_h) {
+      freeHostIndices = (copyMode == CEED_OWN_POINTER);
+
+      if ((copyMode == CEED_OWN_POINTER) || (copyMode == CEED_USE_POINTER)) {
+        hostIndices = const_cast<CeedInt*>(indices_h);
+      }
+
+      if (hostIndices) {
+        indices = getDevice().malloc<CeedInt>(ceedElementCount * ceedElementSize,
+                                              hostIndices);
+      }
+    }
+
+    void ElemRestriction::setupFromDeviceMemory(CeedCopyMode copyMode,
+                                                const CeedInt *indices_d) {
+      ::occa::memory deviceIndices = arrayToMemory((CeedScalar*) indices_d);
+
+      freeIndices = (copyMode == CEED_OWN_POINTER);
+
+      if (copyMode == CEED_COPY_VALUES) {
+        indices = deviceIndices.clone();
+      } else {
+        indices = deviceIndices;
+      }
+    }
+
+    void ElemRestriction::setupTransposeIndices() {
+      if (transposeOffsets.isInitialized()) {
+        return;
+      }
+
+      if (hostIndices) {
+        setupTransposeIndices(hostIndices);
+      } else {
+        // Use a temporary buffer to compute transpose indices
+        CeedInt *indices_h = new CeedInt[indices.length()];
+        indices.copyTo((void*) indices_h);
+
+        setupTransposeIndices(indices_h);
+
+        delete [] indices_h;
+      }
+    }
+
+    void ElemRestriction::setupTransposeIndices(const CeedInt *indices_h) {
+      const CeedInt offsetsCount = ceedNodeCount + 1;
+      const CeedInt elementEntryCount = ceedElementCount * ceedElementSize;
+
+      CeedInt *transposeOffsets_h = new CeedInt[offsetsCount];
+      CeedInt *transposeIndices_h = new CeedInt[elementEntryCount];
+
+      // Setup offsets
+      for (CeedInt i = 0; i < offsetsCount; ++i) {
+        transposeOffsets_h[i] = 0;
+      }
+      for (CeedInt i = 0; i < elementEntryCount; ++i) {
+        ++transposeOffsets_h[indices_h[i] + 1];
+      }
+      for (CeedInt i = 1; i < offsetsCount; ++i) {
+        transposeOffsets_h[i] += transposeOffsets_h[i - 1];
+      }
+
+      // Setup indices
+      for (CeedInt i = 0; i < elementEntryCount; ++i) {
+        const CeedInt index = transposeOffsets_h[indices_h[i]]++;
+        transposeIndices_h[index] = i;
+      }
+
+      // Reset offsets
+      for (int i = offsetsCount - 1; i > 0; --i) {
+        transposeOffsets_h[i] = transposeOffsets_h[i - 1];
+      }
+      transposeOffsets_h[0] = 0;
+
+      // Copy to device
+      transposeOffsets = getDevice().malloc<CeedInt>(offsetsCount,
+                                                     transposeOffsets_h);
+      transposeIndices = getDevice().malloc<CeedInt>(elementEntryCount,
+                                                     transposeIndices_h);
     }
 
     ElemRestriction* ElemRestriction::from(CeedElemRestriction r) {
@@ -48,6 +142,9 @@ namespace ceed {
       CeedOccaFromChk(ierr);
 
       ierr = CeedElemRestrictionGetElementSize(r, &elemRestriction->ceedElementSize);
+      CeedOccaFromChk(ierr);
+
+      ierr = CeedElemRestrictionGetNumNodes(r, &elemRestriction->ceedNodeCount);
       CeedOccaFromChk(ierr);
 
       ierr = CeedElemRestrictionGetNumComponents(r, &elemRestriction->ceedComponentCount);
@@ -102,15 +199,31 @@ namespace ceed {
       return CeedSetBackendFunction(ceed, "ElemRestriction", r, fname, f);
     }
 
-    int ElemRestriction::ceedCreate(CeedElemRestriction r) {
+    int ElemRestriction::ceedCreate(CeedMemType memType,
+                                    CeedCopyMode copyMode,
+                                    const CeedInt *indices,
+                                    CeedElemRestriction r) {
       OCCA_DEBUG_TRACE("elem-restriction: ceedCreate");
 
       int ierr;
       Ceed ceed;
       ierr = CeedElemRestrictionGetCeed(r, &ceed); CeedChk(ierr);
 
+      if ((memType != CEED_MEM_DEVICE) && (memType != CEED_MEM_HOST)) {
+        return CeedError(ceed, 1, "Only HOST and DEVICE CeedMemType supported");
+      }
+
       ElemRestriction *elemRestriction = new ElemRestriction();
       ierr = CeedElemRestrictionSetData(r, (void**) &elemRestriction); CeedChk(ierr);
+
+      // Setup Ceed objects before setting up memory
+      elemRestriction = ElemRestriction::from(r);
+
+      if (memType == CEED_MEM_HOST) {
+        elemRestriction->setupFromHostMemory(copyMode, indices);
+      } else {
+        elemRestriction->setupFromDeviceMemory(copyMode, indices);
+      }
 
       ierr = registerRestrictionFunction(ceed, r, "Apply",
                                          (ceed::occa::ceedFunction) ElemRestriction::ceedApply);
