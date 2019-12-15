@@ -25,16 +25,11 @@ namespace ceed {
         ceedDim(0),
         ceedQuadraturePointCount(0),
         ceedNodeCount(0),
-        ceedComponentCount(0) {
-      OCCA_DEBUG_TRACE("basis: Basis");
-    }
+        ceedComponentCount(0) {}
 
-    Basis::~Basis() {
-      OCCA_DEBUG_TRACE("basis: ~Basis");
-    }
+    Basis::~Basis() {}
 
     Basis* Basis::from(CeedBasis basis) {
-      OCCA_DEBUG_TRACE("basis: from");
       if (!basis) {
         return NULL;
       }
@@ -49,8 +44,6 @@ namespace ceed {
     }
 
     Basis* Basis::from(CeedOperatorField operatorField) {
-      OCCA_DEBUG_TRACE("basis: from");
-
       int ierr;
       CeedBasis basis;
       ierr = CeedOperatorFieldGetBasis(operatorField, &basis); CeedOccaFromChk(ierr);
@@ -58,8 +51,6 @@ namespace ceed {
     }
 
     int Basis::setCeedFields(CeedBasis basis) {
-      OCCA_DEBUG_TRACE("basis: setCeedFields");
-
       int ierr;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);
       ierr = CeedBasisGetDimension(basis, &ceedDim); CeedChk(ierr);
@@ -77,24 +68,18 @@ namespace ceed {
     }
 
     ::occa::device Basis::getDevice() {
-      OCCA_DEBUG_TRACE("basis: getDevice");
-
       return Context::from(ceed)->device;
     }
 
     //---[ Ceed Callbacks ]-----------
     int Basis::registerBasisFunction(Ceed ceed, CeedBasis basis,
                                      const char *fname, ceed::occa::ceedFunction f) {
-      OCCA_DEBUG_TRACE("basis: registerBasisFunction");
-
       return CeedSetBackendFunction(ceed, "Basis", basis, fname, f);
     }
 
     int Basis::ceedApply(CeedBasis basis, const CeedInt nelem,
                          CeedTransposeMode tmode,
                          CeedEvalMode emode, CeedVector u, CeedVector v) {
-      OCCA_DEBUG_TRACE("basis: ceedApply");
-
       Basis *basis_ = Basis::from(basis);
 
       if (!basis_) {
@@ -109,8 +94,6 @@ namespace ceed {
     }
 
     int Basis::ceedDestroy(CeedBasis basis) {
-      OCCA_DEBUG_TRACE("basis: ceedDestroy");
-
       delete Basis::from(basis);
       return 0;
     }

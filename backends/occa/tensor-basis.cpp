@@ -30,8 +30,6 @@ namespace ceed {
         dim(dim_),
         P1D(P1D_),
         Q1D(Q1D_) {
-      OCCA_DEBUG_TRACE("tensor-basis: TensorBasis");
-
       setCeedFields(basis);
 
       ::occa::device device = getDevice();
@@ -47,8 +45,6 @@ namespace ceed {
     }
 
     TensorBasis::~TensorBasis() {
-      OCCA_DEBUG_TRACE("tensor-basis: ~TensorBasis");
-
       interpKernelBuilder.free();
       gradKernelBuilder.free();
       weightKernelBuilder.free();
@@ -58,14 +54,10 @@ namespace ceed {
     }
 
     ::occa::device TensorBasis::getDevice() {
-      OCCA_DEBUG_TRACE("tensor-basis: getDevice");
-
       return Context::from(ceed)->device;
     }
 
     void TensorBasis::setupKernelBuilders() {
-      OCCA_DEBUG_TRACE("tensor-basis: setupKernelBuilders");
-
       const char *cpuKernelSources[3] = {
         tensorBasis1D_cpu_source,
         tensorBasis2D_cpu_source,
@@ -105,8 +97,6 @@ namespace ceed {
                                  const bool transpose,
                                  Vector &U,
                                  Vector &V) {
-      OCCA_DEBUG_TRACE("tensor-basis: applyInterp");
-
       ::occa::kernel interp = (
         usingGPU
         ? getGpuInterpKernel(transpose)
@@ -122,15 +112,11 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuInterpKernel(const bool transpose) {
-      OCCA_DEBUG_TRACE("tensor-basis: getCpuInterpKernel");
-
       return buildCpuEvalKernel(interpKernelBuilder,
                                 transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuInterpKernel(const bool transpose) {
-      OCCA_DEBUG_TRACE("tensor-basis: getGpuInterpKernel");
-
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -159,8 +145,6 @@ namespace ceed {
                                const bool transpose,
                                Vector &U,
                                Vector &V) {
-      OCCA_DEBUG_TRACE("tensor-basis: applyGrad");
-
       ::occa::kernel grad = (
         usingGPU
         ? getGpuGradKernel(transpose)
@@ -176,15 +160,11 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuGradKernel(const bool transpose) {
-      OCCA_DEBUG_TRACE("tensor-basis: getCpuGradKernel");
-
       return buildCpuEvalKernel(gradKernelBuilder,
                                 transpose);
     }
 
     ::occa::kernel TensorBasis::getGpuGradKernel(const bool transpose) {
-      OCCA_DEBUG_TRACE("tensor-basis: getGpuGradKernel");
-
       int elementsPerBlock;
       int sharedBufferSize;
       if (dim == 1) {
@@ -211,8 +191,6 @@ namespace ceed {
 
     int TensorBasis::applyWeight(const CeedInt elementCount,
                                  Vector &W) {
-      OCCA_DEBUG_TRACE("tensor-basis: applyWeight");
-
       ::occa::kernel weight = (
         usingGPU
         ? getGpuWeightKernel()
@@ -225,15 +203,11 @@ namespace ceed {
     }
 
     ::occa::kernel TensorBasis::getCpuWeightKernel() {
-      OCCA_DEBUG_TRACE("tensor-basis: getCpuWeightKernel");
-
       return buildCpuEvalKernel(weightKernelBuilder,
                                 false);
     }
 
     ::occa::kernel TensorBasis::getGpuWeightKernel() {
-      OCCA_DEBUG_TRACE("tensor-basis: getGpuWeightKernel");
-
       int elementsPerBlock;
       if (dim == 1) {
         elementsPerBlock = 32 / Q1D;
@@ -255,8 +229,6 @@ namespace ceed {
 
     ::occa::kernel TensorBasis::buildCpuEvalKernel(::occa::kernelBuilder &kernelBuilder,
                                                    const bool transpose) {
-      OCCA_DEBUG_TRACE("tensor-basis: buildCpuEvalKernel");
-
       ::occa::properties kernelProps;
       kernelProps["defines/TRANSPOSE"] = transpose;
 
@@ -267,8 +239,6 @@ namespace ceed {
                                                    const bool transpose,
                                                    const int elementsPerBlock,
                                                    const int sharedBufferSize) {
-      OCCA_DEBUG_TRACE("tensor-basis: buildGpuEvalKernel");
-
 
       ::occa::properties kernelProps;
       kernelProps["defines/TRANSPOSE"]          = transpose;
@@ -283,8 +253,6 @@ namespace ceed {
                            CeedEvalMode emode,
                            Vector *U,
                            Vector *V) {
-      OCCA_DEBUG_TRACE("tensor-basis: apply");
-
       const bool transpose = tmode == CEED_TRANSPOSE;
 
       if ((dim < 1) || (3 < dim)) {
@@ -332,8 +300,6 @@ namespace ceed {
                                 const CeedScalar *qref1D,
                                 const CeedScalar *qWeight1D,
                                 CeedBasis basis) {
-      OCCA_DEBUG_TRACE("tensor-basis: ceedCreate");
-
       if (Q1D < P1D) {
         return CeedError(
           NULL, 1,

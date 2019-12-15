@@ -31,13 +31,9 @@ namespace ceed {
         ceedOperatorOutputFields(NULL),
         ceedQFunctionInputFields(NULL),
         ceedQFunctionOutputFields(NULL),
-        isInitialized(false) {
-      OCCA_DEBUG_TRACE("operator: Operator");
-    }
+        isInitialized(false) {}
 
     Operator::~Operator() {
-      OCCA_DEBUG_TRACE("operator: ~Operator");
-
       for (int i = 0; i < (int) eVectors.size(); ++i) {
         delete eVectors[i];
       }
@@ -47,7 +43,6 @@ namespace ceed {
     }
 
     Operator* Operator::from(CeedOperator op) {
-      OCCA_DEBUG_TRACE("operator: from");
       if (!op) {
         return NULL;
       }
@@ -84,8 +79,6 @@ namespace ceed {
     }
 
     ::occa::device Operator::getDevice() {
-      OCCA_DEBUG_TRACE("operator: getDevice");
-
       // if (qFunctionKernel.isInitialized()) {
       //   return qFunctionKernel.getDevice();
       // }
@@ -93,8 +86,6 @@ namespace ceed {
     }
 
     int Operator::setup() {
-      OCCA_DEBUG_TRACE("operator: setup");
-
       int ierr;
 
       const CeedInt fieldCount = ceedInputFieldCount + ceedOutputFieldCount;
@@ -134,8 +125,6 @@ namespace ceed {
                                VectorVector_t qVectors,
                                CeedOperatorField *operatorFields,
                                CeedQFunctionField *qFunctionFields) {
-      OCCA_DEBUG_TRACE("operator: setupVectors");
-
       int ierr;
       for (CeedInt i = 0; i < fieldCount; ++i) {
         CeedOperatorField operatorField = operatorFields[i];
@@ -218,8 +207,6 @@ namespace ceed {
     }
 
     int Operator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("operator: apply");
-
       if (!isInitialized) {
         setup();
       }
@@ -230,14 +217,10 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int Operator::registerOperatorFunction(Ceed ceed, CeedOperator op,
                                            const char *fname, ceed::occa::ceedFunction f) {
-      OCCA_DEBUG_TRACE("operator: registerOperatorFunction");
-
       return CeedSetBackendFunction(ceed, "Operator", op, fname, f);
     }
 
     int Operator::ceedCreate(CeedOperator op) {
-      OCCA_DEBUG_TRACE("operator: ceedCreate");
-
       int ierr;
       Ceed ceed;
       ierr = CeedOperatorGetCeed(op, &ceed); CeedChk(ierr);
@@ -258,8 +241,6 @@ namespace ceed {
 
     int Operator::ceedApply(CeedOperator op,
                             CeedVector invec, CeedVector outvec, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("operator: ceedApply");
-
       Operator *operator_ = Operator::from(op);
       Vector *in = Vector::from(invec);
       Vector *out = Vector::from(outvec);
@@ -278,8 +259,6 @@ namespace ceed {
     }
 
     int Operator::ceedDestroy(CeedOperator op) {
-      OCCA_DEBUG_TRACE("operator: ceedDestroy");
-
       delete Operator::from(op);
       return 0;
     }

@@ -27,19 +27,16 @@ namespace ceed {
         ceed(NULL),
         ceedInputFields(0),
         ceedOutputFields(0) {
-      OCCA_DEBUG_TRACE("qfunction: QFunction");
       const size_t colonIndex = source.find(':');
       filename = source.substr(0, colonIndex);
       qFunctionName = source.substr(colonIndex + 1);
     }
 
     QFunction::~QFunction() {
-      OCCA_DEBUG_TRACE("qfunction: ~QFunction");
       qFunctionKernel.free();
     }
 
     QFunction* QFunction::from(CeedQFunction qf) {
-      OCCA_DEBUG_TRACE("qfunction: from");
       if (!qf) {
         return NULL;
       }
@@ -78,7 +75,6 @@ namespace ceed {
     }
 
     ::occa::device QFunction::getDevice() {
-      OCCA_DEBUG_TRACE("qfunction: getDevice");
       if (qFunctionKernel.isInitialized()) {
         return qFunctionKernel.getDevice();
       }
@@ -86,8 +82,6 @@ namespace ceed {
     }
 
     int QFunction::buildKernel(const CeedInt Q) {
-      OCCA_DEBUG_TRACE("qfunction: buildKernel");
-
       // TODO: Store a kernel per Q
       if (qFunctionKernel.isInitialized()) {
         return 0;
@@ -119,8 +113,6 @@ namespace ceed {
 
     std::string QFunction::getKernelSource(const std::string &kernelName,
                                            const CeedInt Q) {
-      OCCA_DEBUG_TRACE("qfunction: getKernelSource");
-
       const int lastArg = ceedInputFields + ceedOutputFields - 1;
       std::stringstream ss;
 
@@ -199,7 +191,6 @@ namespace ceed {
     }
 
     int QFunction::apply(CeedInt Q, CeedVector *U, CeedVector *V) {
-      OCCA_DEBUG_TRACE("qfunction: apply");
       int ierr;
       ierr = buildKernel(Q); CeedChk(ierr);
       syncContext();
@@ -256,13 +247,10 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int QFunction::registerQFunctionFunction(Ceed ceed, CeedQFunction qf,
                                              const char *fname, ceed::occa::ceedFunction f) {
-      OCCA_DEBUG_TRACE("qfunction: registerQFunctionFunction");
       return CeedSetBackendFunction(ceed, "QFunction", qf, fname, f);
     }
 
     int QFunction::ceedCreate(CeedQFunction qf) {
-      OCCA_DEBUG_TRACE("qfunction: ceedCreate");
-
       int ierr;
       Ceed ceed;
       ierr = CeedQFunctionGetCeed(qf, &ceed); CeedChk(ierr);
@@ -287,10 +275,8 @@ namespace ceed {
 
     int QFunction::ceedApply(CeedQFunction qf, CeedInt Q,
                              CeedVector *U, CeedVector *V) {
-      OCCA_DEBUG_TRACE("qfunction: ceedApply");
       QFunction *qFunction = QFunction::from(qf);
       if (qFunction) {
-        OCCA_DEBUG_TRACE("qfunction: from");
         return qFunction->apply(Q, U, V);
       }
 
@@ -298,7 +284,6 @@ namespace ceed {
     }
 
     int QFunction::ceedDestroy(CeedQFunction qf) {
-      OCCA_DEBUG_TRACE("qfunction: ceedDestroy");
       delete QFunction::from(qf);
       return 0;
     }

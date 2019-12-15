@@ -32,8 +32,6 @@ namespace ceed {
         freeIndices(true) {}
 
     ElemRestriction::~ElemRestriction() {
-      OCCA_DEBUG_TRACE("elem-restriction: ~ElemRestriction");
-
       applyWithVTransposeKernelBuilder.free();
       applyWithoutVTransposeKernelBuilder.free();
 
@@ -88,8 +86,6 @@ namespace ceed {
     }
 
     void ElemRestriction::setupKernelBuilders() {
-      OCCA_DEBUG_TRACE("elem-restriction: setupKernelBuilders");
-
       ::occa::properties kernelProps;
       kernelProps["defines/CeedInt"]    = ::occa::dtype::get<CeedInt>().name();
       kernelProps["defines/CeedScalar"] = ::occa::dtype::get<CeedScalar>().name();
@@ -165,7 +161,6 @@ namespace ceed {
     }
 
     ElemRestriction* ElemRestriction::from(CeedElemRestriction r) {
-      OCCA_DEBUG_TRACE("elem-restriction: from");
       if (!r) {
         return NULL;
       }
@@ -195,8 +190,6 @@ namespace ceed {
     }
 
     ElemRestriction* ElemRestriction::from(CeedOperatorField operatorField) {
-      OCCA_DEBUG_TRACE("elem-restriction: from");
-
       int ierr;
       CeedElemRestriction ceedElemRestriction;
 
@@ -207,8 +200,6 @@ namespace ceed {
     }
 
     ::occa::device ElemRestriction::getDevice() {
-      OCCA_DEBUG_TRACE("elem-restriction: getDevice");
-
       return Context::from(ceed)->device;
     }
 
@@ -229,8 +220,6 @@ namespace ceed {
                                Vector &u,
                                Vector &v,
                                CeedRequest *request) {
-      OCCA_DEBUG_TRACE("elem-restriction: apply");
-
       const bool uIsTransposed = (uTransposeMode != CEED_NOTRANSPOSE);
       const bool vIsTransposed = (vTransposeMode != CEED_NOTRANSPOSE);
 
@@ -258,17 +247,13 @@ namespace ceed {
                                     Vector &u,
                                     Vector &v,
                                     CeedRequest *request) {
-      OCCA_DEBUG_TRACE("elem-restriction: applyBlock");
-
       // TODO: Implement
-      return 0;
+      return CeedError(ceed, 1, "Block apply not supported yet");
     }
 
     //---[ Ceed Callbacks ]-----------
     int ElemRestriction::registerRestrictionFunction(Ceed ceed, CeedElemRestriction r,
                                                      const char *fname, ceed::occa::ceedFunction f) {
-      OCCA_DEBUG_TRACE("elem-restriction: registerRestrictionFunction");
-
       return CeedSetBackendFunction(ceed, "ElemRestriction", r, fname, f);
     }
 
@@ -276,8 +261,6 @@ namespace ceed {
                                     CeedCopyMode copyMode,
                                     const CeedInt *indicesInput,
                                     CeedElemRestriction r) {
-      OCCA_DEBUG_TRACE("elem-restriction: ceedCreate");
-
       int ierr;
       Ceed ceed;
       ierr = CeedElemRestrictionGetCeed(r, &ceed); CeedChk(ierr);
@@ -311,8 +294,6 @@ namespace ceed {
     int ElemRestriction::ceedApply(CeedElemRestriction r,
                                    CeedTransposeMode tmode, CeedTransposeMode lmode,
                                    CeedVector u, CeedVector v, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("elem-restriction: ceedApply");
-
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
       Vector *vVector = Vector::from(v);
@@ -334,8 +315,6 @@ namespace ceed {
                                         CeedInt block,
                                         CeedTransposeMode tmode, CeedTransposeMode lmode,
                                         CeedVector u, CeedVector v, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("elem-restriction: ceedApplyBlock");
-
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
       Vector *vVector = Vector::from(v);
@@ -354,8 +333,6 @@ namespace ceed {
     }
 
     int ElemRestriction::ceedDestroy(CeedElemRestriction r) {
-      OCCA_DEBUG_TRACE("elem-restriction: ceedDestroy");
-
       delete ElemRestriction::from(r);
       return 0;
     }

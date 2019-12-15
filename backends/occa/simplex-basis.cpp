@@ -19,21 +19,15 @@
 
 namespace ceed {
   namespace occa {
-    SimplexBasis::SimplexBasis() {
-      OCCA_DEBUG_TRACE("simplex-basis: SimplexBasis");
-    }
+    SimplexBasis::SimplexBasis() {}
 
-    SimplexBasis::~SimplexBasis() {
-      OCCA_DEBUG_TRACE("simplex-basis: ~SimplexBasis");
-    }
+    SimplexBasis::~SimplexBasis() {}
 
     int SimplexBasis::apply(const CeedInt elementCount,
                             CeedTransposeMode tmode,
                             CeedEvalMode emode,
                             Vector *u,
                             Vector *v) {
-      OCCA_DEBUG_TRACE("simplex-basis: apply");
-
       return 0;
     }
 
@@ -45,8 +39,6 @@ namespace ceed {
                                  const CeedScalar *qref,
                                  const CeedScalar *qweight,
                                  CeedBasis basis) {
-      OCCA_DEBUG_TRACE("simplex-basis: ceedCreate");
-
       int ierr;
       Ceed ceed;
       ierr = CeedBasisGetCeed(basis, &ceed); CeedChk(ierr);

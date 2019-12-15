@@ -20,16 +20,11 @@
 namespace ceed {
   namespace occa {
     CompositeOperator::CompositeOperator() :
-        ceed(NULL) {
-      OCCA_DEBUG_TRACE("composite-operator: CompositeOperator");
-    }
+        ceed(NULL) {}
 
-    CompositeOperator::~CompositeOperator() {
-      OCCA_DEBUG_TRACE("composite-operator: ~CompositeOperator");
-    }
+    CompositeOperator::~CompositeOperator() {}
 
     CompositeOperator* CompositeOperator::from(CeedOperator op) {
-      OCCA_DEBUG_TRACE("composite-operator: from");
       if (!op) {
         return NULL;
       }
@@ -53,8 +48,6 @@ namespace ceed {
     }
 
     int CompositeOperator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("composite-operator: apply");
-
       int ierr;
       const int operatorCount = (int) ceedOperators.size();
 
@@ -70,15 +63,10 @@ namespace ceed {
     //---[ Ceed Callbacks ]-----------
     int CompositeOperator::registerOperatorFunction(Ceed ceed, CeedOperator op,
                                            const char *fname, ceed::occa::ceedFunction f) {
-      OCCA_DEBUG_TRACE("composite-operator: registerOperatorFunction");
-
       return CeedSetBackendFunction(ceed, "Operator", op, fname, f);
     }
 
     int CompositeOperator::ceedCreate(CeedOperator op) {
-      OCCA_DEBUG_TRACE("composite-operator: ceedCreate");
-
-
       int ierr;
 
       Ceed ceed;
@@ -101,8 +89,6 @@ namespace ceed {
 
     int CompositeOperator::ceedApply(CeedOperator op,
                             CeedVector invec, CeedVector outvec, CeedRequest *request) {
-      OCCA_DEBUG_TRACE("composite-operator: ceedApply");
-
       CompositeOperator *operator_ = CompositeOperator::from(op);
       Vector *in = Vector::from(invec);
       Vector *out = Vector::from(outvec);
@@ -121,8 +107,6 @@ namespace ceed {
     }
 
     int CompositeOperator::ceedDestroy(CeedOperator op) {
-      OCCA_DEBUG_TRACE("composite-operator: ceedDestroy");
-
       delete CompositeOperator::from(op);
       return 0;
     }
