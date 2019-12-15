@@ -243,14 +243,8 @@ namespace ceed {
               u.getConstKernelArg(),
               v.getKernelArg());
       } else {
-        // TODO: Make occa::null -> occa::memory possible
-        ::occa::kernelArg indicesArg = (
-          indices.isInitialized()
-          ? (::occa::kernelArg) indices
-          : (::occa::kernelArg) ::occa::null
-        );
         apply(ceedElementCount,
-              indicesArg,
+              indices,
               u.getConstKernelArg(),
               v.getKernelArg());
       }

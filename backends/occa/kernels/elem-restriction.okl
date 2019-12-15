@@ -97,7 +97,7 @@ void applyWithVTranspose(@restrict const CeedInt *offsets,
 
       for (int c = 0; c < COMPONENT_COUNT; ++c) {
 @directive("#if U_IS_TRANSPOSED")
-        vComp[c] += u[u + (uOffset * COMPONENT_COUNT)];
+        vComp[c] += u[c + (uOffset * COMPONENT_COUNT)];
 @directive("#else")
         vComp[c] += u[uOffset + (c * ELEMENT_SIZE)];
 @directive("#endif")
