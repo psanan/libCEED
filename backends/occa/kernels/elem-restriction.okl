@@ -1,0 +1,115 @@
+// Copyright (c) 2019, Lawrence Livermore National Security, LLC.
+// Produced at the Lawrence Livermore National Laboratory. LLNL-CODE-734707.
+// All Rights reserved. See files LICENSE and NOTICE for details.
+//
+// This file is part of CEED, a collection of benchmarks, miniapps, software
+// libraries and APIs for efficient high-order finite element and spectral
+// element discretizations for exascale applications. For more information and
+// source code availability see http://github.com/ceed.
+//
+// The CEED research is supported by the Exascale Computing Project 17-SC-20-SC,
+// a collaborative effort of two U.S. Department of Energy organizations (Office
+// of Science and the National Nuclear Security Administration) responsible for
+// the planning and preparation of a capable exascale ecosystem, including
+// software, applications, hardware, advanced system engineering and early
+// testbed platforms, in support of the nation's exascale computing imperative.
+
+#ifndef CEED_OCCA_KERNELS_ELEMRESTRICTION_HEADER
+#define CEED_OCCA_KERNELS_ELEMRESTRICTION_HEADER
+
+#include "./kernel-defines.hpp"
+
+// Kernels are based on the cuda backend from LLNL and VT groups
+//
+// Expects the following types to be defined:
+// - CeedInt
+// - CeedScalar
+//
+// Expects the following constants to be defined:
+// - COMPONENT_COUNT : CeedInt
+// - ELEMENT_SIZE    : CeedInt
+// - NODE_COUNT      : CeedInt
+// - TILE_SIZE       : int
+// - USES_INDICES    : bool
+// - U_IS_TRANSPOSED : bool
+
+static const char *elemRestriction_source = STRINGIFY_SOURCE(
+
+@kernel
+void applyWithoutVTranspose(const CeedInt elementCount,
+                            @restrict const CeedInt *indices,
+                            @restrict const CeedScalar *u,
+                            @restrict CeedScalar *v) {
+  @tile(TILE_SIZE, @outer, @inner)
+  for (int n = 0; n < (elementCount * ELEMENT_SIZE); ++n) {
+@directive("#if USES_INDICES")
+    const CeedInt uOffset = indices[n];
+@directive("#else")
+    const CeedInt uOffset = n;
+@directive("#endif")
+
+    const CeedInt vOffset = (
+      // Element offset
+      (n / ELEMENT_SIZE) * (ELEMENT_SIZE * COMPONENT_COUNT)
+      // Node offset
+      + (n % ELEMENT_SIZE)
+    );
+
+    for (int c = 0; c < COMPONENT_COUNT; ++c) {
+@directive("#if U_IS_TRANSPOSED")
+      v[vOffset + (c * ELEMENT_SIZE)] = u[c + (uOffset * COMPONENT_COUNT)];
+@directive("#else")
+      v[vOffset + (c * ELEMENT_SIZE)] = u[uOffset + (c * NODE_COUNT)];
+@directive("#endif")
+    }
+  }
+}
+
+@kernel
+void applyWithVTranspose(@restrict const CeedInt *offsets,
+                         @restrict const CeedInt *indices,
+                         @restrict const CeedScalar *u,
+                         @restrict CeedScalar *v) {
+  @tile(TILE_SIZE, @outer, @inner)
+  for (int n = 0; n < NODE_COUNT; ++n) {
+    CeedScalar vComp[COMPONENT_COUNT];
+
+    const CeedInt offsetStart = offsets[n];
+    const CeedInt offsetEnd = offsets[n + 1];
+
+    for (int c = 0; c < COMPONENT_COUNT; ++c) {
+      vComp[c] = 0;
+    }
+
+    for (CeedInt i = offsetStart; i < offsetEnd; ++i) {
+      const CeedInt index = indices[i];
+
+      const CeedInt uOffset = (
+        // Element offset
+@directive("#if U_IS_TRANSPOSED")
+        ((index / ELEMENT_SIZE) * (ELEMENT_SIZE * COMPONENT_COUNT))
+@directive("#else")
+        ((index / ELEMENT_SIZE) * ELEMENT_SIZE)
+@directive("#endif")
+        // Node offset
+        + (index % ELEMENT_SIZE)
+      );
+
+      for (int c = 0; c < COMPONENT_COUNT; ++c) {
+@directive("#if U_IS_TRANSPOSED")
+        vComp[c] += u[u + (uOffset * COMPONENT_COUNT)];
+@directive("#else")
+        vComp[c] += u[uOffset + (c * ELEMENT_SIZE)];
+@directive("#endif")
+      }
+    }
+
+    for (int c = 0; c < COMPONENT_COUNT; ++c) {
+      v[n + (c * NODE_COUNT)] += vComp[c];
+    }
+  }
+}
+
+);
+
+#endif

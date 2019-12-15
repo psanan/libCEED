@@ -79,7 +79,7 @@ namespace ceed {
     void Vector::resizeMemory(::occa::device device, const CeedInt length_) {
       if (length_ != (CeedInt) memory.length()) {
         memory.free();
-        memory = device.malloc(length_, ::occa::dtype::get<CeedScalar>());
+        memory = device.malloc<CeedScalar>(length_);
       }
     }
 

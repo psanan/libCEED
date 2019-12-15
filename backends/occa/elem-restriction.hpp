@@ -42,16 +42,24 @@ namespace ceed {
       ::occa::memory indices;
       ::occa::memory transposeOffsets;
       ::occa::memory transposeIndices;
+      ::occa::kernelBuilder applyWithVTransposeKernelBuilder;
+      ::occa::kernelBuilder applyWithoutVTransposeKernelBuilder;
 
       ElemRestriction();
 
       ~ElemRestriction();
+
+      void setup(CeedMemType memType,
+                 CeedCopyMode copyMode,
+                 const CeedInt *indicesInput);
 
       void setupFromHostMemory(CeedCopyMode copyMode,
                                const CeedInt *indices_h);
 
       void setupFromDeviceMemory(CeedCopyMode copyMode,
                                  const CeedInt *indices_d);
+
+      void setupKernelBuilders();
 
       void setupTransposeIndices();
       void setupTransposeIndices(const CeedInt *indices_h);
@@ -61,12 +69,21 @@ namespace ceed {
 
       ::occa::device getDevice();
 
-      int apply(CeedTransposeMode tmode, CeedTransposeMode lmode,
-                Vector &u, Vector &v, CeedRequest *request);
+      ::occa::kernel buildApplyKernel(const bool uIsTransposed,
+                                      const bool vIsTransposed);
+
+      int apply(CeedTransposeMode vTransposeMode,
+                CeedTransposeMode uTransposeMode,
+                Vector &u,
+                Vector &v,
+                CeedRequest *request);
 
       int applyBlock(CeedInt block,
-                     CeedTransposeMode tmode, CeedTransposeMode lmode,
-                     Vector &u, Vector &v, CeedRequest *request);
+                     CeedTransposeMode vTransposeMode,
+                     CeedTransposeMode uTransposeMode,
+                     Vector &u,
+                     Vector &v,
+                     CeedRequest *request);
 
       //---[ Ceed Callbacks ]-----------
       static int registerRestrictionFunction(Ceed ceed, CeedElemRestriction r,
@@ -74,7 +91,7 @@ namespace ceed {
 
       static int ceedCreate(CeedMemType memType,
                             CeedCopyMode copyMode,
-                            const CeedInt *indices,
+                            const CeedInt *indicesInput,
                             CeedElemRestriction r);
 
       static int ceedApply(CeedElemRestriction r,

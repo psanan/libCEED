@@ -14,9 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include "elem-restriction.hpp"
-#include "vector.hpp"
-
+#include "./elem-restriction.hpp"
+#include "./vector.hpp"
+#include "./kernels/elem-restriction.okl"
 
 namespace ceed {
   namespace occa {
@@ -33,6 +33,10 @@ namespace ceed {
 
     ElemRestriction::~ElemRestriction() {
       OCCA_DEBUG_TRACE("elem-restriction: ~ElemRestriction");
+
+      applyWithVTransposeKernelBuilder.free();
+      applyWithoutVTransposeKernelBuilder.free();
+
       if (freeHostIndices) {
         CeedFree(&hostIndices);
       }
@@ -42,6 +46,18 @@ namespace ceed {
       }
       transposeOffsets.free();
       transposeIndices.free();
+    }
+
+    void ElemRestriction::setup(CeedMemType memType,
+                                CeedCopyMode copyMode,
+                                const CeedInt *indicesInput) {
+      if (memType == CEED_MEM_HOST) {
+        setupFromHostMemory(copyMode, indicesInput);
+      } else {
+        setupFromDeviceMemory(copyMode, indicesInput);
+      }
+
+      setupKernelBuilders();
     }
 
     void ElemRestriction::setupFromHostMemory(CeedCopyMode copyMode,
@@ -69,6 +85,28 @@ namespace ceed {
       } else {
         indices = deviceIndices;
       }
+    }
+
+    void ElemRestriction::setupKernelBuilders() {
+      OCCA_DEBUG_TRACE("elem-restriction: setupKernelBuilders");
+
+      ::occa::properties kernelProps;
+      kernelProps["defines/CeedInt"]    = ::occa::dtype::get<CeedInt>().name();
+      kernelProps["defines/CeedScalar"] = ::occa::dtype::get<CeedScalar>().name();
+
+      kernelProps["defines/COMPONENT_COUNT"] = ceedComponentCount;
+      kernelProps["defines/ELEMENT_SIZE"]    = ceedElementSize;
+      kernelProps["defines/NODE_COUNT"]      = ceedNodeCount;
+      kernelProps["defines/TILE_SIZE"]       = 64;
+      kernelProps["defines/USES_INDICES"]    = indices.isInitialized();
+
+      applyWithVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestriction_source, "applyWithVTranspose", kernelProps
+      );
+
+      applyWithoutVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestriction_source, "applyWithoutVTranspose", kernelProps
+      );
     }
 
     void ElemRestriction::setupTransposeIndices() {
@@ -174,17 +212,51 @@ namespace ceed {
       return Context::from(ceed)->device;
     }
 
-    int ElemRestriction::apply(CeedTransposeMode tmode, CeedTransposeMode lmode,
-                               Vector &u, Vector &v, CeedRequest *request) {
+    ::occa::kernel ElemRestriction::buildApplyKernel(const bool uIsTransposed,
+                                                     const bool vIsTransposed) {
+      ::occa::properties kernelProps;
+      kernelProps["defines/U_IS_TRANSPOSED"] = uIsTransposed;
+
+      return (
+        vIsTransposed
+        ? applyWithVTransposeKernelBuilder.build(getDevice(), kernelProps)
+        : applyWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps)
+      );
+    }
+
+    int ElemRestriction::apply(CeedTransposeMode vTransposeMode,
+                               CeedTransposeMode uTransposeMode,
+                               Vector &u,
+                               Vector &v,
+                               CeedRequest *request) {
       OCCA_DEBUG_TRACE("elem-restriction: apply");
 
-      // TODO: Implement
+      const bool uIsTransposed = (uTransposeMode != CEED_NOTRANSPOSE);
+      const bool vIsTransposed = (vTransposeMode != CEED_NOTRANSPOSE);
+
+      ::occa::kernel apply = buildApplyKernel(uIsTransposed, vIsTransposed);
+
+      if (vIsTransposed) {
+        apply(transposeOffsets,
+              transposeIndices,
+              u.getConstKernelArg(),
+              v.getKernelArg());
+      } else {
+        apply(ceedElementCount,
+              indices,
+              u.getConstKernelArg(),
+              v.getKernelArg());
+      }
+
       return 0;
     }
 
     int ElemRestriction::applyBlock(CeedInt block,
-                                    CeedTransposeMode tmode, CeedTransposeMode lmode,
-                                    Vector &u, Vector &v, CeedRequest *request) {
+                                    CeedTransposeMode vTransposeMode,
+                                    CeedTransposeMode uTransposeMode,
+                                    Vector &u,
+                                    Vector &v,
+                                    CeedRequest *request) {
       OCCA_DEBUG_TRACE("elem-restriction: applyBlock");
 
       // TODO: Implement
@@ -201,7 +273,7 @@ namespace ceed {
 
     int ElemRestriction::ceedCreate(CeedMemType memType,
                                     CeedCopyMode copyMode,
-                                    const CeedInt *indices,
+                                    const CeedInt *indicesInput,
                                     CeedElemRestriction r) {
       OCCA_DEBUG_TRACE("elem-restriction: ceedCreate");
 
@@ -218,12 +290,7 @@ namespace ceed {
 
       // Setup Ceed objects before setting up memory
       elemRestriction = ElemRestriction::from(r);
-
-      if (memType == CEED_MEM_HOST) {
-        elemRestriction->setupFromHostMemory(copyMode, indices);
-      } else {
-        elemRestriction->setupFromDeviceMemory(copyMode, indices);
-      }
+      elemRestriction->setup(memType, copyMode, indicesInput);
 
       ierr = registerRestrictionFunction(ceed, r, "Apply",
                                          (ceed::occa::ceedFunction) ElemRestriction::ceedApply);

@@ -17,20 +17,6 @@
 #include "tensor-basis.hpp"
 #include "kernels/tensor-basis.hpp"
 
-// Kernels are based on the cuda backend from LLNL and VT groups
-//
-// Expects the following types to be defined:
-// - CeedInt
-// - CeedScalar
-//
-// Expects the following constants to be defined:
-// - Q1D                  : CeedInt
-// - P1D                  : CeedInt
-// - BASIS_COMPONENT_COUNT: CeedInt
-// - ELEMENTS_PER_BLOCK   : CeedInt
-// - SHARED_BUFFER_SIZE   : CeedInt
-// - TRANSPOSE            : bool
-
 namespace ceed {
   namespace occa {
     TensorBasis::TensorBasis(CeedBasis basis,
@@ -53,10 +39,9 @@ namespace ceed {
         usingGPU = true;
       }
 
-      ::occa::dtype_t ceedScalarDtype = ::occa::dtype::get<CeedScalar>();
-      interp1D  = device.malloc(P1D * Q1D, ceedScalarDtype, interp1D_);
-      grad1D    = device.malloc(P1D * Q1D, ceedScalarDtype, grad1D_);
-      qWeight1D = device.malloc(Q1D, ceedScalarDtype, qWeight1D_);
+      interp1D  = device.malloc<CeedScalar>(P1D * Q1D, interp1D_);
+      grad1D    = device.malloc<CeedScalar>(P1D * Q1D, grad1D_);
+      qWeight1D = device.malloc<CeedScalar>(Q1D, qWeight1D_);
 
       setupKernelBuilders();
     }

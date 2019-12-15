@@ -17,6 +17,20 @@
 #ifndef CEED_OCCA_KERNELS_TENSORBASIS_HEADER
 #define CEED_OCCA_KERNELS_TENSORBASIS_HEADER
 
+// Kernels are based on the cuda backend from LLNL and VT groups
+//
+// Expects the following types to be defined:
+// - CeedInt
+// - CeedScalar
+//
+// Expects the following constants to be defined:
+// - Q1D                  : CeedInt
+// - P1D                  : CeedInt
+// - BASIS_COMPONENT_COUNT: CeedInt
+// - ELEMENTS_PER_BLOCK   : CeedInt
+// - SHARED_BUFFER_SIZE   : CeedInt
+// - TRANSPOSE            : bool
+
 #include "tensor-basis/cpu/tensor-basis-1d.okl"
 #include "tensor-basis/cpu/tensor-basis-2d.okl"
 #include "tensor-basis/cpu/tensor-basis-3d.okl"
