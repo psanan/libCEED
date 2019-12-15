@@ -237,13 +237,20 @@ namespace ceed {
       ::occa::kernel apply = buildApplyKernel(uIsTransposed, vIsTransposed);
 
       if (vIsTransposed) {
+        setupTransposeIndices();
         apply(transposeOffsets,
               transposeIndices,
               u.getConstKernelArg(),
               v.getKernelArg());
       } else {
+        // TODO: Make occa::null -> occa::memory possible
+        ::occa::kernelArg indicesArg = (
+          indices.isInitialized()
+          ? (::occa::kernelArg) indices
+          : (::occa::kernelArg) ::occa::null
+        );
         apply(ceedElementCount,
-              indices,
+              indicesArg,
               u.getConstKernelArg(),
               v.getKernelArg());
       }
