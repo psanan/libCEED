@@ -14,41 +14,24 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#ifndef CEED_OCCA_COMPOSITEOPERATOR_HEADER
-#define CEED_OCCA_COMPOSITEOPERATOR_HEADER
+#ifndef CEED_OCCA_CEEDOBJECT_HEADER
+#define CEED_OCCA_CEEDOBJECT_HEADER
 
-#include <vector>
-
-#include "operator.hpp"
+#include "types.hpp"
 
 
 namespace ceed {
   namespace occa {
-    typedef std::vector<ceed::occa::Operator*> OperatorVector_t;
+    class CeedObject {
+     private:
+      ::occa::device device;
 
-    class CompositeOperator : public CeedObject {
      public:
-      // Ceed object information
-      OperatorVector_t ceedOperators;
+      Ceed ceed;
 
-      CompositeOperator();
+      CeedObject(Ceed ceed_ = NULL);
 
-      ~CompositeOperator();
-
-      static CompositeOperator* from(CeedOperator op);
-
-      int apply(Vector &in, Vector &out, CeedRequest *request);
-
-      //---[ Ceed Callbacks ]-----------
-      static int registerOperatorFunction(Ceed ceed, CeedOperator op,
-                                          const char *fname, ceed::occa::ceedFunction f);
-
-      static int ceedCreate(CeedOperator op);
-
-      static int ceedApply(CeedOperator op,
-                           CeedVector invec, CeedVector outvec, CeedRequest *request);
-
-      static int ceedDestroy(CeedOperator op);
+      ::occa::device getDevice();
     };
   }
 }

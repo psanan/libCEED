@@ -17,7 +17,7 @@
 #ifndef CEED_OCCA_VECTOR_HEADER
 #define CEED_OCCA_VECTOR_HEADER
 
-#include "types.hpp"
+#include "ceed-object.hpp"
 
 
 namespace ceed {
@@ -25,11 +25,8 @@ namespace ceed {
     ::occa::memory arrayToMemory(CeedScalar *array);
     CeedScalar* memoryToArray(::occa::memory &memory);
 
-    class Vector {
+    class Vector : public CeedObject {
      public:
-      // Ceed object information
-      Ceed ceed;
-
       // Owned resources
       CeedInt length;
       ::occa::memory memory;
@@ -48,8 +45,6 @@ namespace ceed {
       ~Vector();
 
       static Vector* from(CeedVector vec);
-
-      ::occa::device getDevice();
 
       void resize(const CeedInt length_);
 

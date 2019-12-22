@@ -17,16 +17,15 @@
 #ifndef CEED_OCCA_BASIS_HEADER
 #define CEED_OCCA_BASIS_HEADER
 
-#include "types.hpp"
+#include "ceed-object.hpp"
 #include "vector.hpp"
 
 
 namespace ceed {
   namespace occa {
-    class Basis {
+    class Basis : public CeedObject {
      public:
       // Ceed object information
-      Ceed ceed;
       CeedInt ceedDim;
       CeedInt ceedQuadraturePointCount;
       CeedInt ceedNodeCount;
@@ -40,8 +39,6 @@ namespace ceed {
       static Basis* from(CeedOperatorField operatorField);
 
       int setCeedFields(CeedBasis basis);
-
-      ::occa::device getDevice();
 
       virtual int apply(const CeedInt elementCount,
                         CeedTransposeMode tmode,

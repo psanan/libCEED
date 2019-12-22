@@ -21,7 +21,6 @@
 namespace ceed {
   namespace occa {
     Basis::Basis() :
-        ceed(NULL),
         ceedDim(0),
         ceedQuadraturePointCount(0),
         ceedNodeCount(0),
@@ -65,10 +64,6 @@ namespace ceed {
       CeedChk(ierr);
 
       return 0;
-    }
-
-    ::occa::device Basis::getDevice() {
-      return Context::from(ceed)->device;
     }
 
     //---[ Ceed Callbacks ]-----------

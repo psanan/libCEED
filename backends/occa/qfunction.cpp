@@ -22,9 +22,7 @@
 
 namespace ceed {
   namespace occa {
-    QFunction::QFunction(::occa::device device,
-                         const std::string &source) :
-        ceed(NULL),
+    QFunction::QFunction(const std::string &source) :
         ceedInputFields(0),
         ceedOutputFields(0) {
       const size_t colonIndex = source.find(':');
@@ -72,13 +70,6 @@ namespace ceed {
       CeedOccaFromChk(ierr);
 
       return qFunction;
-    }
-
-    ::occa::device QFunction::getDevice() {
-      if (qFunctionKernel.isInitialized()) {
-        return qFunctionKernel.getDevice();
-      }
-      return Context::from(ceed)->device;
     }
 
     int QFunction::buildKernel(const CeedInt Q) {
@@ -259,7 +250,7 @@ namespace ceed {
       char *source;
       ierr = CeedQFunctionGetSourcePath(qf, &source); CeedChk(ierr);
 
-      QFunction *qFunction = new QFunction(context->device, source);
+      QFunction *qFunction = new QFunction(source);
       ierr = CeedQFunctionSetData(qf, (void**) &qFunction); CeedChk(ierr);
 
       ierr = registerQFunctionFunction(ceed, qf, "Apply",

@@ -17,16 +17,15 @@
 #ifndef CEED_OCCA_ELEMRESTRICTION_HEADER
 #define CEED_OCCA_ELEMRESTRICTION_HEADER
 
-#include "types.hpp"
+#include "ceed-object.hpp"
 #include "vector.hpp"
 
 
 namespace ceed {
   namespace occa {
-    class ElemRestriction {
+    class ElemRestriction : public CeedObject {
      public:
       // Ceed object information
-      Ceed ceed;
       CeedInt ceedElementCount;
       CeedInt ceedElementSize;
       CeedInt ceedNodeCount;
@@ -66,8 +65,6 @@ namespace ceed {
 
       static ElemRestriction* from(CeedElemRestriction r);
       static ElemRestriction* from(CeedOperatorField operatorField);
-
-      ::occa::device getDevice();
 
       ::occa::kernel buildApplyKernel(const bool uIsTransposed,
                                       const bool vIsTransposed);

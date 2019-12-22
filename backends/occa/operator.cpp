@@ -22,7 +22,6 @@
 namespace ceed {
   namespace occa {
     Operator::Operator() :
-        ceed(NULL),
         ceedQ(0),
         ceedElementCount(0),
         ceedInputFieldCount(0),
@@ -78,139 +77,16 @@ namespace ceed {
       return operator_;
     }
 
-    ::occa::device Operator::getDevice() {
-      // if (qFunctionKernel.isInitialized()) {
-      //   return qFunctionKernel.getDevice();
-      // }
-      return Context::from(ceed)->device;
-    }
-
     int Operator::setup() {
-      int ierr;
-
-      const CeedInt fieldCount = ceedInputFieldCount + ceedOutputFieldCount;
-      eVectors.resize(fieldCount);
-      qVectors.resize(fieldCount);
-      for (CeedInt i = 0; i < fieldCount; ++i) {
-        eVectors[i] = new Vector();
-        qVectors[i] = new Vector();
-      }
-
-      VectorVector_t eInputVectors(eVectors.begin(), eVectors.begin() + ceedInputFieldCount);
-      VectorVector_t qInputVectors(qVectors.begin(), qVectors.begin() + ceedInputFieldCount);
-      VectorVector_t eOutputVectors(eVectors.begin() + ceedInputFieldCount, eVectors.end());
-      VectorVector_t qOutputVectors(qVectors.begin() + ceedInputFieldCount, qVectors.end());
-
-      ierr = setupVectors(
-        ceedInputFieldCount,
-        eInputVectors,
-        qInputVectors,
-        ceedOperatorInputFields,
-        ceedQFunctionInputFields
-      ); CeedChk(ierr);
-
-      ierr = setupVectors(
-        ceedOutputFieldCount,
-        eOutputVectors,
-        qOutputVectors,
-        ceedOperatorOutputFields,
-        ceedQFunctionOutputFields
-      ); CeedChk(ierr);
-
-      return 0;
-    }
-
-    int Operator::setupVectors(CeedInt fieldCount,
-                               VectorVector_t eVectors,
-                               VectorVector_t qVectors,
-                               CeedOperatorField *operatorFields,
-                               CeedQFunctionField *qFunctionFields) {
-      int ierr;
-      for (CeedInt i = 0; i < fieldCount; ++i) {
-        CeedOperatorField operatorField = operatorFields[i];
-        CeedQFunctionField qFunctionField = qFunctionFields[i];
-        Vector &qVector = *qVectors[i];
-        Vector &eVector = *eVectors[i];
-
-        CeedEvalMode emode;
-        ierr = CeedQFunctionFieldGetEvalMode(qFunctionField, &emode); CeedChk(ierr);
-
-        // Get component count
-        CeedInt componentCount = 0;
-        switch (emode) {
-          case CEED_EVAL_NONE:
-          case CEED_EVAL_INTERP:
-          case CEED_EVAL_GRAD: {
-            ElemRestriction *restrict = ElemRestriction::from(operatorFields[0]);
-            componentCount = restrict->ceedComponentCount;
-            break;
-          }
-          case CEED_EVAL_WEIGHT:
-            componentCount = 1;
-            break;
-          case CEED_EVAL_DIV:
-            // TODO: Not implemented
-            return CeedError(ceed, 1, "CEED_EVAL_DIV is not implemented yet");
-          case CEED_EVAL_CURL:
-            // TODO: Not implemented
-            return CeedError(ceed, 1, "CEED_EVAL_CURL is not implemented yet");
-          default:
-            return CeedError(ceed, 1, "QFunctionField EvalMode is not implemented yet");
-        }
-
-        // Get basis
-        Basis *basis = NULL;
-        switch (emode) {
-          case CEED_EVAL_GRAD:
-          case CEED_EVAL_WEIGHT:
-            basis = Basis::from(operatorField);
-            if (!basis) {
-              return CeedError(ceed, 1, "Incorrect CeedBasis from opfield[%i]", (int) i);
-            }
-            break;
-          default: {}
-        }
-
-        // Resize qVector
-        switch (emode) {
-          case CEED_EVAL_NONE:
-          case CEED_EVAL_INTERP:
-          case CEED_EVAL_WEIGHT:
-            qVector.resize(ceedElementCount * ceedQ * componentCount);
-            break;
-          case CEED_EVAL_GRAD:
-            qVector.resize(ceedElementCount * ceedQ * componentCount * basis->ceedDim);
-            break;
-          default:
-            return CeedError(ceed, 1, "QFunctionField EvalMode is not implemented yet");
-        }
-
-        // Apply weight
-        if (emode == CEED_EVAL_WEIGHT) {
-          ierr = basis->apply(
-            ceedElementCount,
-            CEED_NOTRANSPOSE, CEED_EVAL_WEIGHT,
-            NULL, &qVector
-          ); CeedChk(ierr);
-        }
-
-        if (emode != CEED_EVAL_WEIGHT) {
-          ElemRestriction *restrict = ElemRestriction::from(operatorField);
-          if (!restrict) {
-            return CeedError(ceed, 1, "Incorrect ElemRestriction from opfield[%i]", (int) i);
-          }
-          // TODO: Implement
-          // ierr = restrict->setupVector(NULL, eVector); CeedChk(ierr);
-        }
+      if (isInitialized) {
+        return 0;
       }
       return 0;
     }
 
     int Operator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      if (!isInitialized) {
-        setup();
-      }
-      // TODO: Implement
+      setup();
+
       return 0;
     }
 
@@ -228,6 +104,10 @@ namespace ceed {
       Operator *operator_ = new Operator();
       ierr = CeedOperatorSetData(op, (void**) &operator_); CeedChk(ierr);
 
+      ierr = registerOperatorFunction(ceed, op, "AssembleLinearQFunction",
+                                      (ceed::occa::ceedFunction) Operator::ceedAssembleLinearQFunction);
+      CeedChk(ierr);
+
       ierr = registerOperatorFunction(ceed, op, "Apply",
                                       (ceed::occa::ceedFunction) Operator::ceedApply);
       CeedChk(ierr);
@@ -237,6 +117,10 @@ namespace ceed {
       CeedChk(ierr);
 
       return 0;
+    }
+
+    int Operator::ceedAssembleLinearQFunction(CeedOperator op) {
+      return CeedError(NULL, 1, "Backend does not implement AssembleLinearQFunction");
     }
 
     int Operator::ceedApply(CeedOperator op,

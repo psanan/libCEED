@@ -19,17 +19,17 @@
 
 #include <vector>
 
-#include "types.hpp"
+#include "ceed-object.hpp"
 #include "vector.hpp"
 
 
 namespace ceed {
   namespace occa {
     typedef std::vector<ceed::occa::Vector*> VectorVector_t;
-    class Operator {
+
+    class Operator : public CeedObject {
      public:
       // Ceed object information
-      Ceed ceed;
       CeedInt ceedQ;
       CeedInt ceedElementCount;
       CeedInt ceedInputFieldCount;
@@ -50,15 +50,7 @@ namespace ceed {
 
       static Operator* from(CeedOperator op);
 
-      ::occa::device getDevice();
-
       int setup();
-
-      int setupVectors(CeedInt fieldCount,
-                       VectorVector_t eVectors,
-                       VectorVector_t qVectors,
-                       CeedOperatorField *operatorFields,
-                       CeedQFunctionField *qFunctionFields);
 
       int apply(Vector &in, Vector &out, CeedRequest *request);
 
@@ -67,6 +59,8 @@ namespace ceed {
                                           const char *fname, ceed::occa::ceedFunction f);
 
       static int ceedCreate(CeedOperator op);
+
+      static int ceedAssembleLinearQFunction(CeedOperator op);
 
       static int ceedApply(CeedOperator op,
                            CeedVector invec, CeedVector outvec, CeedRequest *request);

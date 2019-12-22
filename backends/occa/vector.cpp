@@ -31,7 +31,6 @@ namespace ceed {
     }
 
     Vector::Vector() :
-        ceed(NULL),
         length(0),
         hostBufferLength(0),
         hostBuffer(NULL),
@@ -59,13 +58,6 @@ namespace ceed {
       }
 
       return vector;
-    }
-
-    ::occa::device Vector::getDevice() {
-      if (memory.isInitialized()) {
-        return memory.getDevice();
-      }
-      return Context::from(ceed)->device;
     }
 
     void Vector::resize(const CeedInt length_) {

@@ -21,7 +21,6 @@
 namespace ceed {
   namespace occa {
     ElemRestriction::ElemRestriction() :
-        ceed(NULL),
         ceedElementCount(0),
         ceedElementSize(0),
         ceedNodeCount(0),
@@ -197,10 +196,6 @@ namespace ceed {
       CeedOccaFromChk(ierr);
 
       return from(ceedElemRestriction);
-    }
-
-    ::occa::device ElemRestriction::getDevice() {
-      return Context::from(ceed)->device;
     }
 
     ::occa::kernel ElemRestriction::buildApplyKernel(const bool uIsTransposed,

@@ -17,15 +17,14 @@
 #ifndef CEED_OCCA_QFUNCTION_HEADER
 #define CEED_OCCA_QFUNCTION_HEADER
 
-#include "types.hpp"
+#include "ceed-object.hpp"
 
 
 namespace ceed {
   namespace occa {
-    class QFunction {
+    class QFunction : public CeedObject {
      public:
       // Ceed object information
-      Ceed ceed;
       CeedInt ceedInputFields;
       CeedInt ceedOutputFields;
       std::vector<CeedInt> ceedInputFieldSizes;
@@ -39,14 +38,11 @@ namespace ceed {
       ::occa::kernel qFunctionKernel;
       ::occa::memory qFunctionContext;
 
-      QFunction(::occa::device device,
-                const std::string &source);
+      QFunction(const std::string &source);
 
       ~QFunction();
 
       static QFunction* from(CeedQFunction qf);
-
-      ::occa::device getDevice();
 
       int buildKernel(const CeedInt Q);
       std::string getKernelSource(const std::string &kernelName,
