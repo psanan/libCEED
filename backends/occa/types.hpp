@@ -27,6 +27,14 @@
     }                                           \
   } while (0)
 
+#define CeedOccaValidChk(isValidVar, ierr)      \
+  do {                                          \
+    if (ierr) {                                 \
+      isValidVar = false;                       \
+      return;                                   \
+    }                                           \
+  } while (0)
+
 #define CeedHandleOccaException(exc)            \
   do {                                          \
     std::string error = exc.toString();         \

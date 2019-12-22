@@ -18,6 +18,7 @@
 #define CEED_OCCA_QFUNCTION_HEADER
 
 #include "ceed-object.hpp"
+#include "qfunction-args.hpp"
 
 
 namespace ceed {
@@ -25,10 +26,6 @@ namespace ceed {
     class QFunction : public CeedObject {
      public:
       // Ceed object information
-      CeedInt ceedInputFields;
-      CeedInt ceedOutputFields;
-      std::vector<CeedInt> ceedInputFieldSizes;
-      std::vector<CeedInt> ceedOutputFieldSizes;
       size_t ceedContextSize;
       void *ceedContext;
 
@@ -37,6 +34,7 @@ namespace ceed {
       std::string qFunctionName;
       ::occa::kernel qFunctionKernel;
       ::occa::memory qFunctionContext;
+      QFunctionArgs args;
 
       QFunction(const std::string &source);
 

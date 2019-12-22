@@ -22,9 +22,7 @@
 
 namespace ceed {
   namespace occa {
-    QFunction::QFunction(const std::string &source) :
-        ceedInputFields(0),
-        ceedOutputFields(0) {
+    QFunction::QFunction(const std::string &source) {
       const size_t colonIndex = source.find(':');
       filename = source.substr(0, colonIndex);
       qFunctionName = source.substr(colonIndex + 1);
@@ -42,32 +40,22 @@ namespace ceed {
       int ierr;
       QFunction *qFunction;
 
-      ierr = CeedQFunctionGetData(qf, (void**) &qFunction); CeedOccaFromChk(ierr);
-      ierr = CeedQFunctionGetCeed(qf, &qFunction->ceed); CeedOccaFromChk(ierr);
-      ierr = CeedQFunctionGetNumArgs(
-        qf,
-        &qFunction->ceedInputFields,
-        &qFunction->ceedOutputFields
-      ); CeedOccaFromChk(ierr);
-
-      CeedQFunctionField *inputFields, *outputFields;
-      CeedInt size;
-      ierr = CeedQFunctionGetFields(qf, &inputFields, &outputFields);
+      ierr = CeedQFunctionGetData(qf, (void**) &qFunction);
       CeedOccaFromChk(ierr);
 
-      for (int i = 0; i < qFunction->ceedInputFields; ++i) {
-        ierr = CeedQFunctionFieldGetSize(inputFields[i], &size); CeedOccaFromChk(ierr);
-        qFunction->ceedInputFieldSizes.push_back(size);
-      }
-      for (int i = 0; i < qFunction->ceedOutputFields; ++i) {
-        ierr = CeedQFunctionFieldGetSize(outputFields[i], &size); CeedOccaFromChk(ierr);
-        qFunction->ceedOutputFieldSizes.push_back(size);
-      }
+      ierr = CeedQFunctionGetCeed(qf, &qFunction->ceed);
+      CeedOccaFromChk(ierr);
 
       ierr = CeedQFunctionGetContextSize(qf, &qFunction->ceedContextSize);
       CeedOccaFromChk(ierr);
+
       ierr = CeedQFunctionGetInnerContext(qf, &qFunction->ceedContext);
       CeedOccaFromChk(ierr);
+
+      qFunction->args.setupQFunctionArgs(qf);
+      if (!qFunction->args.isValid()) {
+        return NULL;
+      }
 
       return qFunction;
     }
@@ -104,33 +92,30 @@ namespace ceed {
 
     std::string QFunction::getKernelSource(const std::string &kernelName,
                                            const CeedInt Q) {
-      const int lastArg = ceedInputFields + ceedOutputFields - 1;
       std::stringstream ss;
 
-      ss << "@kernel void " << kernelName << "("                                        << std::endl
-         << "  void *ctx,"                                                              << std::endl;
+      ss << "@kernel void " << kernelName << "("                                        << std::endl;
 
       // qfunction arguments
-      for (int i = 0; i < ceedInputFields; ++i) {
-        const char end = (i != lastArg) ? ',' : ' ';
-        ss << "  const CeedScalar *in_" << i << end                                     << std::endl;
+      for (int i = 0; i < args.inputCount(); ++i) {
+        ss << "  const CeedScalar *in_" << i << ','                                     << std::endl;
       }
-      for (int i = 0; i < ceedOutputFields; ++i) {
-        const char end = (i != lastArg) ? ',' : ' ';
-        ss << "  CeedScalar *out_" << i << end                                          << std::endl;
+      for (int i = 0; i < args.outputCount(); ++i) {
+        ss << "  CeedScalar *out_" << i << ','                                          << std::endl;
       }
+      ss << "  void *ctx"                                                               << std::endl;
+      ss << ") {"                                                                       << std::endl;
 
       // qfunction body
-      ss << ") {"                                                                       << std::endl;
 
       // Call the real qfunction
       ss << "  for (int q = 0; q < " << Q << "; ++q; @tile(128, @outer, @inner)) {"     << std::endl
-         << "    const CeedScalar* in[" << std::max(ceedInputFields, 1) << "];"         << std::endl
-         << "    CeedScalar* out[" << std::max(ceedOutputFields, 1) << "];"             << std::endl;
+         << "    const CeedScalar* in[" << std::max(args.inputCount(), 1) << "];"       << std::endl
+         << "    CeedScalar* out[" << std::max(args.outputCount(), 1) << "];"           << std::endl;
 
       // Set and define in for the q point
-      for (int i = 0; i < ceedInputFields; ++i) {
-        const CeedInt fieldSize = ceedInputFieldSizes[i];
+      for (int i = 0; i < args.inputCount(); ++i) {
+        const CeedInt fieldSize = args.getQfInput(i).size;
         const std::string qIn_i = "qIn_" + ::occa::toString(i);
         const std::string in_i = "in_" + ::occa::toString(i);
 
@@ -143,8 +128,8 @@ namespace ceed {
       }
 
       // Set out for the q point
-      for (int i = 0; i < ceedOutputFields; ++i) {
-        const CeedInt fieldSize = ceedOutputFieldSizes[i];
+      for (int i = 0; i < args.outputCount(); ++i) {
+        const CeedInt fieldSize = args.getQfOutput(i).size;
         const std::string qOut_i = "qOut_" + ::occa::toString(i);
 
         ss << "    CeedScalar " << qOut_i << "[" << fieldSize << "];"                   << std::endl
@@ -154,8 +139,8 @@ namespace ceed {
       ss << "    " << qFunctionName << "(ctx, 1, in, out);"                             << std::endl;
 
       // Copy out for the q point
-      for (int i = 0; i < ceedOutputFields; ++i) {
-        const CeedInt fieldSize = ceedOutputFieldSizes[i];
+      for (int i = 0; i < args.outputCount(); ++i) {
+        const CeedInt fieldSize = args.getQfOutput(i).size;
         const std::string qOut_i = "qOut_" + ::occa::toString(i);
         const std::string out_i = "out_" + ::occa::toString(i);
 
@@ -190,13 +175,7 @@ namespace ceed {
 
       qFunctionKernel.clearArgs();
 
-      if (qFunctionContext.isInitialized()) {
-        qFunctionKernel.pushArg(qFunctionContext);
-      } else {
-        qFunctionKernel.pushArg(::occa::null);
-      }
-
-      for (CeedInt i = 0; i < ceedInputFields; i++) {
+      for (CeedInt i = 0; i < args.inputCount(); i++) {
         Vector *u = Vector::from(U[i]);
         if (!u) {
           return CeedError(ceed, 1, "Incorrect qFunction input field: U[%i]", (int) i);
@@ -208,7 +187,7 @@ namespace ceed {
         qFunctionKernel.pushArg(arrayToMemory(inputArg));
       }
 
-      for (CeedInt i = 0; i < ceedOutputFields; i++) {
+      for (CeedInt i = 0; i < args.outputCount(); i++) {
         Vector *v = Vector::from(V[i]);
         if (!v) {
           return CeedError(ceed, 1, "Incorrect qFunction output field: V[%i]", (int) i);
@@ -220,14 +199,20 @@ namespace ceed {
         qFunctionKernel.pushArg(arrayToMemory(outputArg));
       }
 
+      if (qFunctionContext.isInitialized()) {
+        qFunctionKernel.pushArg(qFunctionContext);
+      } else {
+        qFunctionKernel.pushArg(::occa::null);
+      }
+
       qFunctionKernel.run();
 
-      for (CeedInt i = 0; i < ceedInputFields; i++) {
+      for (CeedInt i = 0; i < args.inputCount(); i++) {
         Vector *u = Vector::from(U[i]);
         ierr = u->restoreArray(&inputArgs[i]); CeedChk(ierr);
       }
 
-      for (CeedInt i = 0; i < ceedOutputFields; i++) {
+      for (CeedInt i = 0; i < args.outputCount(); i++) {
         Vector *v = Vector::from(V[i]);
         ierr = v->restoreArray(&outputArgs[i]); CeedChk(ierr);
       }
