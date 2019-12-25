@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "ceed-object.hpp"
-#include "vector.hpp"
+#include "operator-args.hpp"
 
 
 namespace ceed {
@@ -32,21 +32,11 @@ namespace ceed {
       // Ceed object information
       CeedInt ceedQ;
       CeedInt ceedElementCount;
-      CeedInt ceedInputFieldCount;
-      CeedInt ceedOutputFieldCount;
-      CeedOperatorField *ceedOperatorInputFields;
-      CeedOperatorField *ceedOperatorOutputFields;
-      CeedQFunctionField *ceedQFunctionInputFields;
-      CeedQFunctionField *ceedQFunctionOutputFields;
 
       // Owned resources
-      bool isInitialized;
-      VectorVector_t eVectors;
-      VectorVector_t qVectors;
+      OperatorArgs args;
 
       Operator();
-
-      ~Operator();
 
       static Operator* from(CeedOperator op);
 

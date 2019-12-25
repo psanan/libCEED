@@ -44,14 +44,7 @@ namespace ceed {
       setupKernelBuilders();
     }
 
-    TensorBasis::~TensorBasis() {
-      interpKernelBuilder.free();
-      gradKernelBuilder.free();
-      weightKernelBuilder.free();
-      interp1D.free();
-      grad1D.free();
-      qWeight1D.free();
-    }
+    TensorBasis::~TensorBasis() {}
 
     ::occa::device TensorBasis::getDevice() {
       return Context::from(ceed)->device;

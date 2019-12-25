@@ -15,13 +15,12 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "composite-operator.hpp"
+#include "vector.hpp"
 
 
 namespace ceed {
   namespace occa {
     CompositeOperator::CompositeOperator() {}
-
-    CompositeOperator::~CompositeOperator() {}
 
     CompositeOperator* CompositeOperator::from(CeedOperator op) {
       if (!op) {

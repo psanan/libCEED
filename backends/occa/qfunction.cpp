@@ -23,13 +23,11 @@
 namespace ceed {
   namespace occa {
     QFunction::QFunction(const std::string &source) {
+      qFunctionContext = ::occa::null;
+
       const size_t colonIndex = source.find(':');
       filename = source.substr(0, colonIndex);
       qFunctionName = source.substr(colonIndex + 1);
-    }
-
-    QFunction::~QFunction() {
-      qFunctionKernel.free();
     }
 
     QFunction* QFunction::from(CeedQFunction qf) {
@@ -60,32 +58,40 @@ namespace ceed {
       return qFunction;
     }
 
-    int QFunction::buildKernel(const CeedInt Q) {
-      // TODO: Store a kernel per Q
-      if (qFunctionKernel.isInitialized()) {
-        return 0;
-      }
-
-      const std::string kernelName = "qFunctionKernel";
-
+    ::occa::properties QFunction::getKernelProps(const std::string &qfunctionFilename,
+                                                 const CeedInt Q) {
       ::occa::properties props;
+
+      // Types
       props["defines/CeedInt"] = ::occa::dtype::get<CeedInt>().name();
       props["defines/CeedScalar"] = ::occa::dtype::get<CeedScalar>().name();
+
+      // Consts
+      props["defines/Q"] = Q;
+
+      // Misc
       props["defines/CeedPragmaSIMD"] = "";
 
       std::stringstream ss;
-      ss << "#define CEED_QFUNCTION(FUNC_NAME) \\" << std::endl
-         << "  inline int FUNC_NAME"               << std::endl
-         <<                                           std::endl
-         << "#include \"" << filename << "\""      << std::endl
-         <<                                           std::endl
-         << getKernelSource(kernelName, Q)         << std::endl;
+      ss << "#define CEED_QFUNCTION(FUNC_NAME) \\"     << std::endl
+         << "  inline int FUNC_NAME"                   << std::endl
+         <<                                               std::endl
+         << "#include \"" << qfunctionFilename << "\"" << std::endl;
 
-      qFunctionKernel = (
-        getDevice().buildKernelFromString(ss.str(),
-                                          kernelName,
-                                          props)
-      );
+      props["headers"].asArray() += ss.str();
+
+      return props;
+    }
+
+    int QFunction::buildKernel(const CeedInt Q) {
+      // TODO: Store a kernel per Q
+      if (!qFunctionKernel.isInitialized()) {
+        qFunctionKernel = (
+          getDevice().buildKernelFromString(getKernelSource("qFunctionKernel", Q),
+                                            "qFunctionKernel",
+                                            getKernelProps(filename, Q))
+        );
+      }
 
       return 0;
     }
@@ -94,24 +100,24 @@ namespace ceed {
                                            const CeedInt Q) {
       std::stringstream ss;
 
-      ss << "@kernel void " << kernelName << "("                                        << std::endl;
+      ss << "@kernel"                                                             << std::endl
+         << "void " << kernelName << "("                                          << std::endl;
 
       // qfunction arguments
       for (int i = 0; i < args.inputCount(); ++i) {
-        ss << "  const CeedScalar *in_" << i << ','                                     << std::endl;
+        ss << "  const CeedScalar *in_" << i << ','                               << std::endl;
       }
       for (int i = 0; i < args.outputCount(); ++i) {
-        ss << "  CeedScalar *out_" << i << ','                                          << std::endl;
+        ss << "  CeedScalar *out_" << i << ','                                    << std::endl;
       }
-      ss << "  void *ctx"                                                               << std::endl;
-      ss << ") {"                                                                       << std::endl;
+      ss << "  void *ctx"                                                         << std::endl;
+      ss << ") {"                                                                 << std::endl;
 
-      // qfunction body
-
-      // Call the real qfunction
-      ss << "  for (int q = 0; q < " << Q << "; ++q; @tile(128, @outer, @inner)) {"     << std::endl
-         << "    const CeedScalar* in[" << std::max(args.inputCount(), 1) << "];"       << std::endl
-         << "    CeedScalar* out[" << std::max(args.outputCount(), 1) << "];"           << std::endl;
+      // Iterate over Q and call qfunction
+      ss << "  @tile(128, @outer, @inner)"                                        << std::endl
+         << "  for (int q = 0; q < Q; ++q) {"                                     << std::endl
+         << "    const CeedScalar* in[" << std::max(1, args.inputCount()) << "];" << std::endl
+         << "    CeedScalar* out[" << std::max(1, args.outputCount()) << "];"     << std::endl;
 
       // Set and define in for the q point
       for (int i = 0; i < args.inputCount(); ++i) {
@@ -119,12 +125,12 @@ namespace ceed {
         const std::string qIn_i = "qIn_" + ::occa::toString(i);
         const std::string in_i = "in_" + ::occa::toString(i);
 
-        ss << "    CeedScalar " << qIn_i << "[" << fieldSize << "];"                    << std::endl
-           << "    in[" << i << "] = " << qIn_i << ";"                                  << std::endl
+        ss << "    CeedScalar " << qIn_i << "[" << fieldSize << "];"              << std::endl
+           << "    in[" << i << "] = " << qIn_i << ";"                            << std::endl
             // Copy q data
-           << "    for (int q_i = 0; q_i < " << fieldSize << "; ++q_i) {"               << std::endl
-           << "      " << qIn_i << "[q_i] = " << in_i << "[q + (" << Q << " * q_i)];"   << std::endl
-           << "    }"                                                                   << std::endl;
+           << "    for (int q_i = 0; q_i < " << fieldSize << "; ++q_i) {"         << std::endl
+           << "      " << qIn_i << "[q_i] = " << in_i << "[q + (Q * q_i)];"       << std::endl
+           << "    }"                                                             << std::endl;
       }
 
       // Set out for the q point
@@ -132,11 +138,11 @@ namespace ceed {
         const CeedInt fieldSize = args.getQfOutput(i).size;
         const std::string qOut_i = "qOut_" + ::occa::toString(i);
 
-        ss << "    CeedScalar " << qOut_i << "[" << fieldSize << "];"                   << std::endl
-           << "    out[" << i << "] = " << qOut_i << ";"                                << std::endl;
+        ss << "    CeedScalar " << qOut_i << "[" << fieldSize << "];"             << std::endl
+           << "    out[" << i << "] = " << qOut_i << ";"                          << std::endl;
       }
 
-      ss << "    " << qFunctionName << "(ctx, 1, in, out);"                             << std::endl;
+      ss << "    " << qFunctionName << "(ctx, 1, in, out);"                       << std::endl;
 
       // Copy out for the q point
       for (int i = 0; i < args.outputCount(); ++i) {
@@ -144,12 +150,12 @@ namespace ceed {
         const std::string qOut_i = "qOut_" + ::occa::toString(i);
         const std::string out_i = "out_" + ::occa::toString(i);
 
-        ss << "    for (int q_i = 0; q_i < " << fieldSize << "; ++q_i) {"               << std::endl
-           << "      " << out_i << "[q + (" << Q << " * q_i)] = " << qOut_i << "[q_i];" << std::endl
-           << "    }"                                                                   << std::endl;
+        ss << "    for (int q_i = 0; q_i < " << fieldSize << "; ++q_i) {"         << std::endl
+           << "      " << out_i << "[q + (Q * q_i)] = " << qOut_i << "[q_i];"     << std::endl
+           << "    }"                                                             << std::endl;
       }
 
-      ss << "  }"                                                                       << std::endl
+      ss << "  }"                                                                 << std::endl
          << "}";
 
       return ss.str();
@@ -199,11 +205,7 @@ namespace ceed {
         qFunctionKernel.pushArg(arrayToMemory(outputArg));
       }
 
-      if (qFunctionContext.isInitialized()) {
-        qFunctionKernel.pushArg(qFunctionContext);
-      } else {
-        qFunctionKernel.pushArg(::occa::null);
-      }
+      qFunctionKernel.pushArg(qFunctionContext);
 
       qFunctionKernel.run();
 

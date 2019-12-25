@@ -46,6 +46,8 @@ namespace ceed {
       ierr = CeedOperatorFieldGetElemRestriction(opField, &ceedElemRestriction);
       CeedOccaValidChk(_isValid, ierr);
 
+      _isValid = true;
+
       vec = Vector::from(ceedVector);
       basis = Basis::from(ceedBasis);
       elemRestriction = ElemRestriction::from(ceedElemRestriction);

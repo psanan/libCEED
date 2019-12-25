@@ -31,18 +31,12 @@ namespace ceed {
         freeIndices(true) {}
 
     ElemRestriction::~ElemRestriction() {
-      applyWithVTransposeKernelBuilder.free();
-      applyWithoutVTransposeKernelBuilder.free();
-
       if (freeHostIndices) {
         CeedFree(&hostIndices);
       }
-
       if (freeIndices) {
         indices.free();
       }
-      transposeOffsets.free();
-      transposeIndices.free();
     }
 
     void ElemRestriction::setup(CeedMemType memType,

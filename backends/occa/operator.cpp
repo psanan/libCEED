@@ -23,23 +23,7 @@ namespace ceed {
   namespace occa {
     Operator::Operator() :
         ceedQ(0),
-        ceedElementCount(0),
-        ceedInputFieldCount(0),
-        ceedOutputFieldCount(0),
-        ceedOperatorInputFields(NULL),
-        ceedOperatorOutputFields(NULL),
-        ceedQFunctionInputFields(NULL),
-        ceedQFunctionOutputFields(NULL),
-        isInitialized(false) {}
-
-    Operator::~Operator() {
-      for (int i = 0; i < (int) eVectors.size(); ++i) {
-        delete eVectors[i];
-      }
-      for (int i = 0; i < (int) qVectors.size(); ++i) {
-        delete qVectors[i];
-      }
-    }
+        ceedElementCount(0) {}
 
     Operator* Operator::from(CeedOperator op) {
       if (!op) {
@@ -48,39 +32,25 @@ namespace ceed {
 
       int ierr;
       Operator *operator_;
-      CeedQFunction qf;
 
       ierr = CeedOperatorGetData(op, (void**) &operator_); CeedOccaFromChk(ierr);
-      ierr = CeedOperatorGetQFunction(op, &qf); CeedOccaFromChk(ierr);
+      ierr = CeedOperatorGetCeed(op, &operator_->ceed); CeedOccaFromChk(ierr);
 
-      // Get dimensions
       ierr = CeedOperatorGetNumQuadraturePoints(op, &operator_->ceedQ); CeedOccaFromChk(ierr);
       ierr = CeedOperatorGetNumElements(op, &operator_->ceedElementCount); CeedOccaFromChk(ierr);
-      ierr = CeedQFunctionGetNumArgs(
-        qf,
-        &operator_->ceedInputFieldCount,
-        &operator_->ceedOutputFieldCount
-      ); CeedOccaFromChk(ierr);
 
-      // Get Fields
-      ierr = CeedOperatorGetFields(
-        op,
-        &operator_->ceedOperatorInputFields,
-        &operator_->ceedOperatorOutputFields
-      ); CeedOccaFromChk(ierr);
-      ierr = CeedQFunctionGetFields(
-        qf,
-        &operator_->ceedQFunctionInputFields,
-        &operator_->ceedQFunctionOutputFields
-      ); CeedOccaFromChk(ierr);
+      operator_->args.setupArgs(op);
+      if (!operator_->args.isValid()) {
+        return NULL;
+      }
 
       return operator_;
     }
 
     int Operator::setup() {
-      if (isInitialized) {
-        return 0;
-      }
+      // if (isInitialized) {
+      //   return 0;
+      // }
       return 0;
     }
 

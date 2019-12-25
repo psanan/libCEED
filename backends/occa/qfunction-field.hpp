@@ -32,6 +32,11 @@ namespace ceed {
       QFunctionField(CeedQFunctionField qfField);
 
       bool isValid() const;
+
+      bool usesB() const;
+      bool usesG() const;
+      bool usesW() const;
+      bool usesIndices() const;
     };
   }
 }

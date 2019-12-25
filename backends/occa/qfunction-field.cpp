@@ -37,5 +37,23 @@ namespace ceed {
     bool QFunctionField::isValid() const {
       return _isValid;
     }
+
+    bool QFunctionField::usesB() const {
+      return ((evalMode == CEED_EVAL_INTERP)
+              || (evalMode == CEED_EVAL_GRAD));
+    }
+
+    bool QFunctionField::usesG() const {
+      return (evalMode == CEED_EVAL_GRAD);
+    }
+
+    bool QFunctionField::usesW() const {
+      return (evalMode == CEED_EVAL_WEIGHT);
+    }
+
+    bool QFunctionField::usesIndices() const {
+      return ((evalMode == CEED_EVAL_INTERP)
+              || (evalMode == CEED_EVAL_GRAD));
+    }
   }
 }

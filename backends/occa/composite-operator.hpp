@@ -33,8 +33,6 @@ namespace ceed {
 
       CompositeOperator();
 
-      ~CompositeOperator();
-
       static CompositeOperator* from(CeedOperator op);
 
       int apply(Vector &in, Vector &out, CeedRequest *request);

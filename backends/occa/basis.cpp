@@ -37,6 +37,10 @@ namespace ceed {
       Basis *basis_;
 
       ierr = CeedBasisGetData(basis, (void**) &basis_); CeedOccaFromChk(ierr);
+      if (!basis_) {
+        return NULL;
+      }
+
       ierr = basis_->setCeedFields(basis); CeedOccaFromChk(ierr);
 
       return basis_;
