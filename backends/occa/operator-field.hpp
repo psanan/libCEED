@@ -38,6 +38,18 @@ namespace ceed {
       OperatorField(CeedOperatorField opField);
 
       bool isValid() const;
+
+      //---[ Basis Info ]---------------
+      int getP() const;
+      int getQ() const;
+      int getComponentCount() const;
+      //================================
+
+      //---[ ElemRestriction Info ]-----
+      int getElementCount() const;
+      int getElementSize() const;
+      int getNodeCount() const; // TODO: Remove?
+      //================================
     };
   }
 }

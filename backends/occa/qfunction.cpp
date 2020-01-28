@@ -58,6 +58,20 @@ namespace ceed {
       return qFunction;
     }
 
+    QFunction* QFunction::from(CeedOperator op) {
+      if (!op) {
+        return NULL;
+      }
+
+      CeedQFunction qf;
+      int ierr = 0;
+
+      ierr = CeedOperatorGetQFunction(op, &qf);
+      CeedOccaFromChk(ierr);
+
+      return QFunction::from(qf);
+    }
+
     ::occa::properties QFunction::getKernelProps(const std::string &qfunctionFilename,
                                                  const CeedInt Q) {
       ::occa::properties props;

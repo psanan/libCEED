@@ -57,5 +57,57 @@ namespace ceed {
     bool OperatorField::isValid() const {
       return _isValid;
     }
+
+    //---[ Basis Info ]-----------------
+    int OperatorField::getP() const {
+      return (
+        basis
+        ? basis->ceedNodeCount
+        : 0
+      );
+    }
+
+    int OperatorField::getQ() const {
+      return (
+        basis
+        ? basis->ceedQuadraturePointCount
+        : 0
+      );
+    }
+
+    int OperatorField::getComponentCount() const {
+      return (
+        basis
+        ? basis->ceedComponentCount
+        : 1
+      );
+    }
+    //==================================
+
+    //---[ ElemRestriction Info ]-------
+    int OperatorField::getElementCount() const {
+      return (
+        elemRestriction
+        ? elemRestriction->ceedElementCount
+        : 1
+      );
+    }
+
+    int OperatorField::getElementSize() const {
+      return (
+        elemRestriction
+        ? elemRestriction->ceedElementSize
+        : 1
+      );
+    }
+
+    int OperatorField::getNodeCount() const {
+      return (
+        elemRestriction
+        ? elemRestriction->ceedNodeCount
+        : 1
+      );
+    }
+    //==================================
   }
 }

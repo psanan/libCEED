@@ -39,6 +39,7 @@ namespace ceed {
       QFunction(const std::string &source);
 
       static QFunction* from(CeedQFunction qf);
+      static QFunction* from(CeedOperator op);
 
       static ::occa::properties getKernelProps(const std::string &qfunctionFilename,
                                                const CeedInt Q);

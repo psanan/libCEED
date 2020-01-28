@@ -27,6 +27,8 @@ namespace ceed {
   namespace occa {
     typedef std::vector<ceed::occa::Vector*> VectorVector_t;
 
+    class QFunction;
+
     class Operator : public CeedObject {
      public:
       // Ceed object information
@@ -34,13 +36,15 @@ namespace ceed {
       CeedInt ceedElementCount;
 
       // Owned resources
+      QFunction *qfunction;
       OperatorArgs args;
+      ::occa::kernel applyKernel;
 
       Operator();
 
       static Operator* from(CeedOperator op);
 
-      int setup();
+      void buildApplyKernel();
 
       int apply(Vector &in, Vector &out, CeedRequest *request);
 

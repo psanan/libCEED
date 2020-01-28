@@ -16,14 +16,17 @@
 
 #include "basis.hpp"
 #include "elem-restriction.hpp"
+#include "operator-kernel-builder.hpp"
 #include "operator.hpp"
+#include "qfunction.hpp"
 
 
 namespace ceed {
   namespace occa {
     Operator::Operator() :
         ceedQ(0),
-        ceedElementCount(0) {}
+        ceedElementCount(0),
+        qfunction(NULL) {}
 
     Operator* Operator::from(CeedOperator op) {
       if (!op) {
@@ -36,6 +39,11 @@ namespace ceed {
       ierr = CeedOperatorGetData(op, (void**) &operator_); CeedOccaFromChk(ierr);
       ierr = CeedOperatorGetCeed(op, &operator_->ceed); CeedOccaFromChk(ierr);
 
+      operator_->qfunction = QFunction::from(op);
+      if (!operator_->qfunction) {
+        return NULL;
+      }
+
       ierr = CeedOperatorGetNumQuadraturePoints(op, &operator_->ceedQ); CeedOccaFromChk(ierr);
       ierr = CeedOperatorGetNumElements(op, &operator_->ceedElementCount); CeedOccaFromChk(ierr);
 
@@ -47,15 +55,22 @@ namespace ceed {
       return operator_;
     }
 
-    int Operator::setup() {
-      // if (isInitialized) {
-      //   return 0;
-      // }
-      return 0;
+    void Operator::buildApplyKernel() {
+      if (!applyKernel.isInitialized()) {
+        applyKernel = OperatorKernelBuilder::build(getDevice(),
+                                                   qfunction->filename,
+                                                   qfunction->qFunctionName,
+                                                   ceedQ,
+                                                   args);
+      }
     }
 
     int Operator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      setup();
+      buildApplyKernel();
+
+      if (!applyKernel.isInitialized()) {
+        return CeedError(NULL, 1, "Error building apply kernel");
+      }
 
       return 0;
     }
