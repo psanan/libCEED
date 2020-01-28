@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Lawrence Livermore National Security, LLC.
+// Copyright (c) 2020, Lawrence Livermore National Security, LLC.
 // Produced at the Lawrence Livermore National Laboratory. LLNL-CODE-734707.
 // All Rights reserved. See files LICENSE and NOTICE for details.
 //
@@ -14,28 +14,22 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include "types.hpp"
+#include "gpu-operator.hpp"
+
 
 namespace ceed {
   namespace occa {
-    Context::Context(::occa::device device_) :
-        device(device_) {
-      const std::string mode = device.mode();
-      _usingCpuDevice = (mode == "Serial" || mode == "OpenMP");
+    GpuOperator::GpuOperator() {}
+
+    GpuOperator::~GpuOperator() {}
+
+    ::occa::kernel GpuOperator::buildApplyKernel() {
+      // TODO: Implement
+      return ::occa::kernel();
     }
 
-    Context* Context::from(Ceed ceed) {
-      if (!ceed) {
-        return NULL;
-      }
-
-      Context *context;
-      CeedGetData(ceed, (void**) &context);
-      return context;
-    }
-
-    bool Context::usingCpuDevice() const {
-      return _usingCpuDevice;
+    void GpuOperator::apply(Vector &in, Vector &out) {
+      // TODO: Implement
     }
   }
 }

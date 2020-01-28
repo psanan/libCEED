@@ -123,10 +123,8 @@ namespace ceed {
       }
 
       int ierr;
-      ceed::occa::Context *context = new Context();
+      ceed::occa::Context *context = new Context(::occa::device(deviceProps));
       ierr = CeedSetData(ceed, (void**) &context); CeedChk(ierr);
-
-      context->device = ::occa::device(deviceProps);
 
       return 0;
     }

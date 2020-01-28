@@ -18,6 +18,8 @@
 #include "elem-restriction.hpp"
 #include "operator-kernel-builder.hpp"
 #include "operator.hpp"
+#include "cpu-operator.hpp"
+#include "gpu-operator.hpp"
 #include "qfunction.hpp"
 
 
@@ -27,6 +29,8 @@ namespace ceed {
         ceedQ(0),
         ceedElementCount(0),
         qfunction(NULL) {}
+
+    Operator::~Operator() {}
 
     Operator* Operator::from(CeedOperator op) {
       if (!op) {
@@ -55,22 +59,16 @@ namespace ceed {
       return operator_;
     }
 
-    void Operator::buildApplyKernel() {
-      if (!applyKernel.isInitialized()) {
-        applyKernel = OperatorKernelBuilder::build(getDevice(),
-                                                   qfunction->filename,
-                                                   qfunction->qFunctionName,
-                                                   ceedQ,
-                                                   args);
-      }
-    }
-
     int Operator::apply(Vector &in, Vector &out, CeedRequest *request) {
-      buildApplyKernel();
-
       if (!applyKernel.isInitialized()) {
-        return CeedError(NULL, 1, "Error building apply kernel");
+        applyKernel = buildApplyKernel();
+
+        if (!applyKernel.isInitialized()) {
+          return CeedError(NULL, 1, "Error building apply kernel");
+        }
       }
+
+      apply(in, out);
 
       return 0;
     }
@@ -86,7 +84,12 @@ namespace ceed {
       Ceed ceed;
       ierr = CeedOperatorGetCeed(op, &ceed); CeedChk(ierr);
 
-      Operator *operator_ = new Operator();
+      Operator *operator_ = (
+        (Context::from(ceed)->usingCpuDevice())
+        ? ((Operator*) new CpuOperator())
+        : ((Operator*) new GpuOperator())
+      );
+
       ierr = CeedOperatorSetData(op, (void**) &operator_); CeedChk(ierr);
 
       ierr = registerOperatorFunction(ceed, op, "AssembleLinearQFunction",

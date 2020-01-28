@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Lawrence Livermore National Security, LLC.
+// Copyright (c) 2020, Lawrence Livermore National Security, LLC.
 // Produced at the Lawrence Livermore National Laboratory. LLNL-CODE-734707.
 // All Rights reserved. See files LICENSE and NOTICE for details.
 //
@@ -14,28 +14,30 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
-#include "types.hpp"
+#include "cpu-operator.hpp"
+#include "qfunction.hpp"
+
 
 namespace ceed {
   namespace occa {
-    Context::Context(::occa::device device_) :
-        device(device_) {
-      const std::string mode = device.mode();
-      _usingCpuDevice = (mode == "Serial" || mode == "OpenMP");
+    CpuOperator::CpuOperator() {}
+
+    CpuOperator::~CpuOperator() {}
+
+    ::occa::kernel CpuOperator::buildApplyKernel() {
+      return ::occa::kernel();
+      // OperatorKernelBuilder::build(getDevice(),
+      //                              qfunction->filename,
+      //                              qfunction->qFunctionName,
+      //                              ceedQ,
+      //                              args);
     }
 
-    Context* Context::from(Ceed ceed) {
-      if (!ceed) {
-        return NULL;
-      }
-
-      Context *context;
-      CeedGetData(ceed, (void**) &context);
-      return context;
+    void CpuOperator::setupApply(Vector &in, Vector &out) {
     }
 
-    bool Context::usingCpuDevice() const {
-      return _usingCpuDevice;
+    void CpuOperator::apply(Vector &in, Vector &out) {
+      setupApply(in, out);
     }
   }
 }

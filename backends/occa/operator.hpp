@@ -41,12 +41,16 @@ namespace ceed {
       ::occa::kernel applyKernel;
 
       Operator();
+      virtual ~Operator();
 
       static Operator* from(CeedOperator op);
 
-      void buildApplyKernel();
-
       int apply(Vector &in, Vector &out, CeedRequest *request);
+
+      //---[ Virtual Methods ]----------
+      virtual ::occa::kernel buildApplyKernel() = 0;
+
+      virtual void apply(Vector &in, Vector &out) = 0;
 
       //---[ Ceed Callbacks ]-----------
       static int registerOperatorFunction(Ceed ceed, CeedOperator op,

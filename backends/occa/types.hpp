@@ -46,10 +46,17 @@ namespace ceed {
     typedef int (*ceedFunction)();
 
     class Context {
+     private:
+      bool _usingCpuDevice;
+
      public:
       ::occa::device device;
 
+      Context(::occa::device device_);
+
       static Context* from(Ceed ceed);
+
+      bool usingCpuDevice() const;
     };
 
     typedef enum {
