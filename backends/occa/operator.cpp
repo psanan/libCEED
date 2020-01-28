@@ -28,7 +28,8 @@ namespace ceed {
     Operator::Operator() :
         ceedQ(0),
         ceedElementCount(0),
-        qfunction(NULL) {}
+        qfunction(NULL),
+        hasInitialSetup(false) {}
 
     Operator::~Operator() {}
 
@@ -68,12 +69,20 @@ namespace ceed {
         }
       }
 
+      if (!hasInitialSetup) {
+        initialSetup(in, out);
+        hasInitialSetup = true;
+      }
+
       apply(in, out);
 
       return 0;
     }
 
-    //---[ Ceed Callbacks ]-----------
+    //---[ Virtual Methods ]------------
+    void Operator::initialSetup(Vector &in, Vector &out) {}
+
+    //---[ Ceed Callbacks ]-------------
     int Operator::registerOperatorFunction(Ceed ceed, CeedOperator op,
                                            const char *fname, ceed::occa::ceedFunction f) {
       return CeedSetBackendFunction(ceed, "Operator", op, fname, f);

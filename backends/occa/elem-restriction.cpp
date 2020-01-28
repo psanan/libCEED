@@ -96,6 +96,18 @@ namespace ceed {
       applyWithoutVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
         elemRestriction_source, "applyWithoutVTranspose", kernelProps
       );
+
+      // Add block size
+      kernelProps["defines/BLOCK_SIZE"] = ceedBlockSize;
+
+      // TODO: Implement
+      // applyBlockedWithVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+      //   elemRestrictionBlocked_source, "applyWithVTranspose", kernelProps
+      // );
+
+      applyBlockedWithoutVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestrictionBlocked_source, "applyWithoutVTranspose", kernelProps
+      );
     }
 
     void ElemRestriction::setupTransposeIndices() {
@@ -179,6 +191,9 @@ namespace ceed {
       ierr = CeedElemRestrictionGetBlockSize(r, &elemRestriction->ceedBlockSize);
       CeedOccaFromChk(ierr);
 
+      // Set to at least 1
+      elemRestriction->ceedBlockSize = std::max(1, elemRestriction->ceedBlockSize);
+
       return elemRestriction;
     }
 
@@ -230,14 +245,46 @@ namespace ceed {
       return 0;
     }
 
+    ::occa::kernel ElemRestriction::buildApplyBlockedKernel(const bool uIsTransposed,
+                                                            const bool vIsTransposed) {
+      ::occa::properties kernelProps;
+      kernelProps["defines/U_IS_TRANSPOSED"] = uIsTransposed;
+
+      // return (
+      //   vIsTransposed
+      //   ? applyBlockedWithVTransposeKernelBuilder.build(getDevice(), kernelProps)
+      //   : applyBlockedWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps)
+      // );
+
+      return applyBlockedWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps);
+    }
+
     int ElemRestriction::applyBlock(CeedInt block,
                                     CeedTransposeMode vTransposeMode,
                                     CeedTransposeMode uTransposeMode,
                                     Vector &u,
                                     Vector &v,
                                     CeedRequest *request) {
-      // TODO: Implement
-      return CeedError(ceed, 1, "Block apply not supported yet");
+      const bool uIsTransposed = (uTransposeMode != CEED_NOTRANSPOSE);
+      const bool vIsTransposed = (vTransposeMode != CEED_NOTRANSPOSE);
+
+      if (vIsTransposed) {
+        return CeedError(ceed, 1, "Blocked apply not supported yet for transposed v");
+      }
+
+      ::occa::kernel apply = buildApplyBlockedKernel(uIsTransposed, vIsTransposed);
+
+      const int firstElement = block * ceedBlockSize;
+      const int lastElement = std::min(ceedElementCount,
+                                       (CeedInt) (firstElement + ceedBlockSize));
+
+      apply(firstElement,
+            lastElement,
+            indices,
+            u.getConstKernelArg(),
+            v.getKernelArg());
+
+      return 0;
     }
 
     //---[ Ceed Callbacks ]-----------

@@ -32,6 +32,8 @@ namespace ceed {
 
       ::occa::kernel buildApplyKernel();
 
+      void initialSetup(Vector &in, Vector &out);
+
       void setupApply(Vector &in, Vector &out);
 
       void apply(Vector &in, Vector &out);

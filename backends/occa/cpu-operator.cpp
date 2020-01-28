@@ -33,6 +33,32 @@ namespace ceed {
                                              args);
     }
 
+    void CpuOperator::initialSetup(Vector &in, Vector &out) {
+      // ierr = CeedCalloc(numinputfields + numoutputfields, &impl->blkrestr);
+      // CeedChk(ierr);
+      // ierr = CeedCalloc(numinputfields + numoutputfields, &impl->evecs);
+      // CeedChk(ierr);
+      // ierr = CeedCalloc(numinputfields + numoutputfields, &impl->edata);
+      // CeedChk(ierr);
+
+      // // Max 16 inputs
+      // ierr = CeedCalloc(16, &impl->inputstate); CeedChk(ierr);
+      // ierr = CeedCalloc(16, &impl->evecsin); CeedChk(ierr);
+      // ierr = CeedCalloc(16, &impl->evecsout); CeedChk(ierr);
+      // ierr = CeedCalloc(16, &impl->qvecsin); CeedChk(ierr);
+      // ierr = CeedCalloc(16, &impl->qvecsout); CeedChk(ierr);
+
+      // ierr = CeedOperatorSetupFields_Opt(qf, op, 0, blksize, impl->blkrestr,
+      //                                    impl->evecs, impl->evecsin,
+      //                                    impl->qvecsin, 0,
+      //                                    numinputfields, Q);
+
+      // ierr = CeedOperatorSetupFields_Opt(qf, op, 1, blksize, impl->blkrestr,
+      //                                    impl->evecs, impl->evecsout,
+      //                                    impl->qvecsout, numinputfields,
+      //                                    numoutputfields, Q);
+    }
+
     void CpuOperator::setupApply(Vector &in, Vector &out) {
     }
 

@@ -43,6 +43,8 @@ namespace ceed {
       ::occa::memory transposeIndices;
       ::occa::kernelBuilder applyWithVTransposeKernelBuilder;
       ::occa::kernelBuilder applyWithoutVTransposeKernelBuilder;
+      ::occa::kernelBuilder applyBlockedWithVTransposeKernelBuilder;
+      ::occa::kernelBuilder applyBlockedWithoutVTransposeKernelBuilder;
 
       ElemRestriction();
 
@@ -74,6 +76,9 @@ namespace ceed {
                 Vector &u,
                 Vector &v,
                 CeedRequest *request);
+
+      ::occa::kernel buildApplyBlockedKernel(const bool uIsTransposed,
+                                           const bool vIsTransposed);
 
       int applyBlock(CeedInt block,
                      CeedTransposeMode vTransposeMode,

@@ -39,6 +39,7 @@ namespace ceed {
       QFunction *qfunction;
       OperatorArgs args;
       ::occa::kernel applyKernel;
+      bool hasInitialSetup;
 
       Operator();
       virtual ~Operator();
@@ -49,6 +50,8 @@ namespace ceed {
 
       //---[ Virtual Methods ]----------
       virtual ::occa::kernel buildApplyKernel() = 0;
+
+      virtual void initialSetup(Vector &in, Vector &out);
 
       virtual void apply(Vector &in, Vector &out) = 0;
 
