@@ -50,57 +50,9 @@ namespace ceed {
                                   const OperatorField &opField,
                                   const QFunctionField &qfField);
 
-      void variableSetup();
-      void readQuads();
-      void qfunctionArgs();
-      void writeQuads();
-
-      //---[ None ]---------------------
-      void noneReadQuads(const int index,
-                         const OperatorField &opField,
-                         const QFunctionField &qfField);
-
-      void noneWriteQuads(const int index,
-                          const OperatorField &opField,
-                          const QFunctionField &qfField);
-      //================================
-
-      //---[ Interp ]-------------------
-      void interpReadQuads(const int index,
-                           const OperatorField &opField,
-                           const QFunctionField &qfField);
-
-      void interpWriteQuads(const int index,
-                            const OperatorField &opField,
-                            const QFunctionField &qfField);
-      //================================
-
-      //---[ Grad ]---------------------
-      void gradReadQuads(const int index,
-                         const OperatorField &opField,
-                         const QFunctionField &qfField);
-
-      void gradWriteQuads(const int index,
-                          const OperatorField &opField,
-                          const QFunctionField &qfField);
-      //================================
-
-      //---[ Weight ]-------------------
-      void weightReadQuads(const int index,
-                           const OperatorField &opField,
-                           const QFunctionField &qfField);
-
-      void weightWriteQuads(const int index,
-                            const OperatorField &opField,
-                            const QFunctionField &qfField);
-      //================================
-
       //---[ Code ]---------------------
       void indent();
       void unindent();
-
-      void startElementForLoop();
-      void endElementForLoop();
       //================================
 
       //---[ Variables ]----------------
@@ -136,28 +88,7 @@ namespace ceed {
       }
 
       // Arguments
-      CEED_OCCA_DEFINE_VAR(B)
-      CEED_OCCA_DEFINE_VAR(G)
-      CEED_OCCA_DEFINE_VAR(W)
-      CEED_OCCA_DEFINE_VAR(field)
-      CEED_OCCA_DEFINE_VAR(indices)
-
-      // Field-specific information
-      CEED_OCCA_DEFINE_VAR(componentCount)
-      CEED_OCCA_DEFINE_VAR(P)
-      CEED_OCCA_DEFINE_VAR(s_B)
-      CEED_OCCA_DEFINE_VAR(s_G)
-
-      // Assumes Q is the same in all fields
-      // CEED_OCCA_DEFINE_VAR(Q)
-
-      // Intermediate values (dofs/quads)
-      CEED_OCCA_DEFINE_VAR(r_fieldDofs)      // d_u / d_v
-      CEED_OCCA_DEFINE_VAR(r_fieldQuads)     // r_t
-      CEED_OCCA_DEFINE_VAR(r_fieldGradQuads) // r_u
-
-      // QFunction arguments
-      CEED_OCCA_DEFINE_VAR(r_qfField)        // r_q / r_qq
+      CEED_OCCA_DEFINE_VAR(varName)
 
 
 #undef CEED_OCCA_DEFINE_VAR
@@ -170,12 +101,6 @@ namespace ceed {
                            const bool isInput,
                            const int index,
                            const std::string &arrayIndex);
-      //================================
-
-
-      //---[ Methods ]------------------
-      void cacheArray(const std::string &ptr,
-                      const std::string &sharedPtr);
       //================================
 
       static ::occa::kernel build(const ::occa::device &device,

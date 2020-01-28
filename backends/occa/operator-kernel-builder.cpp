@@ -55,10 +55,7 @@ namespace ceed {
       indent();
 
       // Kernel body
-      variableSetup();
-      readQuads();
-      qfunctionArgs();
-      writeQuads();
+      // TODO
 
       unindent();
       ss << tab << "}" << std::endl; // @inner
@@ -128,157 +125,6 @@ namespace ceed {
       ss << std::endl;
     }
 
-    void OperatorKernelBuilder::variableSetup() {
-      bool wroteToSharedMemory = false;
-
-      for (int isInput = 1; isInput >= 0; --isInput) {
-        for (int i = 0; i < args.inputCount(); ++i) {
-          const OperatorField &opField = args.getOpInput(i);
-          const QFunctionField &qfField = args.getQfInput(i);
-
-          if (qfField.evalMode == CEED_EVAL_WEIGHT) {
-            continue;
-          }
-
-          setVarInfo(isInput, i);
-
-          const int _P = opField.getP();
-
-          // Assumes Q is the same in all fields
-          // const int _Q = ::occa::toString(opField.getQ());
-
-          ss << tab << "const CeedInt " << componentCount() << " = " << opField.getComponentCount()
-             << std::endl;
-
-          if (qfField.usesB() || qfField.usesG()) {
-            wroteToSharedMemory = true;
-
-            ss << tab << "const CeedInt " << P() << " = " << _P << ';' << std::endl;
-
-            if (qfField.usesB()) {
-              ss << tab << "@shared CeedScalar " << s_B(P() + " * Q") << ';' << std::endl;
-              cacheArray(B(), s_B());
-            }
-
-            if (qfField.usesG()) {
-              std::string nodeCount = ::occa::toString(opField.getNodeCount());
-              ss << tab << "@shared CeedScalar " << s_G(nodeCount + " * Q);") << std::endl;
-              cacheArray(G(), s_G());
-            }
-          }
-        }
-      }
-
-      if (wroteToSharedMemory) {
-        ss << tab << "@barrier();" << std::endl;
-      }
-    }
-
-    void OperatorKernelBuilder::readQuads() {
-      for (int i = 0; i < args.inputCount(); ++i) {
-        const OperatorField &opField = args.getOpInput(i);
-        const QFunctionField &qfField = args.getQfInput(i);
-        switch (qfField.evalMode) {
-          case CEED_EVAL_NONE:
-            noneReadQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_INTERP:
-            interpReadQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_GRAD:
-            gradReadQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_WEIGHT:
-            weightReadQuads(i, opField, qfField);
-            break;
-
-          default:
-            ; // Not supported
-        }
-      }
-    }
-
-    void OperatorKernelBuilder::qfunctionArgs() {
-    }
-
-    void OperatorKernelBuilder::writeQuads() {
-      for (int i = 0; i < args.outputCount(); ++i) {
-        const OperatorField &opField = args.getOpOutput(i);
-        const QFunctionField &qfField = args.getQfOutput(i);
-        switch (qfField.evalMode) {
-          case CEED_EVAL_NONE:
-            noneWriteQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_INTERP:
-            interpWriteQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_GRAD:
-            gradWriteQuads(i, opField, qfField);
-            break;
-
-          case CEED_EVAL_WEIGHT:
-            weightWriteQuads(i, opField, qfField);
-            break;
-
-          default:
-            ; // Not supported
-        }
-      }
-    }
-
-    //---[ None ]-----------------------
-    void OperatorKernelBuilder::noneReadQuads(const int index,
-                                              const OperatorField &opField,
-                                              const QFunctionField &qfField) {
-    }
-
-    void OperatorKernelBuilder::noneWriteQuads(const int index,
-                                               const OperatorField &opField,
-                                               const QFunctionField &qfField) {
-    }
-    //==================================
-
-    //---[ Interp ]---------------------
-    void OperatorKernelBuilder::interpReadQuads(const int index,
-                                                const OperatorField &opField,
-                                                const QFunctionField &qfField) {
-    }
-
-    void OperatorKernelBuilder::interpWriteQuads(const int index,
-                                                 const OperatorField &opField,
-                                                 const QFunctionField &qfField) {
-    }
-    //==================================
-
-    //---[ Grad ]-----------------------
-    void OperatorKernelBuilder::gradReadQuads(const int index,
-                                              const OperatorField &opField,
-                                              const QFunctionField &qfField) {
-    }
-
-    void OperatorKernelBuilder::gradWriteQuads(const int index,
-                                               const OperatorField &opField,
-                                               const QFunctionField &qfField) {
-    }
-    //==================================
-
-    //---[ Weight ]---------------------
-    void OperatorKernelBuilder::weightReadQuads(const int index,
-                                                const OperatorField &opField,
-                                                const QFunctionField &qfField) {
-    }
-
-    void OperatorKernelBuilder::weightWriteQuads(const int index,
-                                                 const OperatorField &opField,
-                                                 const QFunctionField &qfField) {
-    }
-    //==================================
-
     //---[ Code ]-----------------------
     void OperatorKernelBuilder::indent() {
       tab += "  ";
@@ -314,21 +160,6 @@ namespace ceed {
       std::stringstream ss2;
       ss2 << var(varName, isInput, index) << '[' << arrayIndex << ']';
       return ss2.str();
-    }
-    //==================================
-
-
-    //---[ Methods ]--------------------
-    void OperatorKernelBuilder::cacheArray(const std::string &ptr,
-                                           const std::string &sharedPtr) {
-      ss << tab << "for (int i = tid; i < (" << P() << " * Q); i += BLOCK_SIZE) {"
-         << std::endl;
-      indent();
-
-      ss << tab << sharedPtr << "[i] = " << ptr << "[i];" << std::endl;
-
-      unindent();
-      ss << tab << "}" << std::endl;
     }
     //==================================
 
