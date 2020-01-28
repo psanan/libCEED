@@ -26,43 +26,16 @@ namespace ceed {
                                                  const std::string &qfunctionName_,
                                                  const CeedInt Q_,
                                                  const OperatorArgs &args_) :
+        kernelName("operator"),
         qfunctionFilename(qfunctionFilename_),
         qfunctionName(qfunctionName_),
         Q(Q_),
         args(args_) {}
 
     ::occa::kernel OperatorKernelBuilder::buildKernel(::occa::device device) {
-      // B = basis_data->d_interp1d;
-      // G = basis_data->d_collograd1d;
-      // G = basis_data->d_grad1d;
-      // W = basis_data->d_qweight1d;
-      // indices = restr_data->d_ind;
-
-      const std::string kernelName = "operator";
       ss.str("");
 
-      ss << tab << "@kernel"                    << std::endl
-         << tab << "void " << kernelName << "(" << std::endl;
-      operatorKernelArguments();
-      ss << tab << ") {"                        << std::endl;
-      indent();
-
-      ss << tab << "for (int eBlock = 0; eBlock < elementCount; eBlock += ELEMENTS_PER_BLOCK; @outer) {" << std::endl;
-      indent();
-
-      ss << tab << "@tile(Q, @inner, @inner)"                  << std::endl
-         << tab << "for (int tid = 0; tid < (Q * Q); ++tid) {" << std::endl;
-      indent();
-
-      // Kernel body
-      // TODO
-
-      unindent();
-      ss << tab << "}" << std::endl; // @inner
-      unindent();
-      ss << tab << "}" << std::endl; // @outer
-      unindent();
-      ss << tab << "}" << std::endl; // @kernel
+      generateKernel(device);
 
       const std::string source = ss.str();
 
@@ -71,58 +44,7 @@ namespace ceed {
 
       return device.buildKernelFromString(source,
                                           kernelName,
-                                          QFunction::getKernelProps(qfunctionFilename, Q));
-    }
-
-    void OperatorKernelBuilder::operatorKernelArguments() {
-      for (int i = 0; i < args.inputCount(); ++i) {
-        operatorKernelArgument(i, true, args.getOpInput(i), args.getQfInput(i));
-      }
-
-      for (int i = 0; i < args.outputCount(); ++i) {
-        operatorKernelArgument(i, false, args.getOpOutput(i), args.getQfOutput(i));
-      }
-
-      ss << "  // Extra params"             << std::endl
-         << "  const CeedInt elementCount," << std::endl
-         << "  const void *ctx"             << std::endl;
-    }
-
-    void OperatorKernelBuilder::operatorKernelArgument(const int index,
-                                                       const bool isInput,
-                                                       const OperatorField &opField,
-                                                       const QFunctionField &qfField) {
-      setVarInfo(isInput, index);
-
-      const std::string qualifiers = isInput ? "" : "const ";
-      const std::string scalarPtr = qualifiers + "CeedScalar *";
-      const std::string intPtr = qualifiers + "CeedInt *";
-
-      if (isInput) {
-        ss << tab << "// Input " << index       << std::endl;
-      } else {
-        ss << tab << "// Output " << index      << std::endl;
-      }
-
-      ss << tab << scalarPtr << field() << ","  << std::endl;
-
-      if (qfField.usesB()) {
-        ss << tab << scalarPtr << B() << ","    << std::endl;
-      }
-
-      if (qfField.usesG()) {
-        ss << tab << scalarPtr << G() << ","    << std::endl;
-      }
-
-      if (qfField.usesW()) {
-        ss << tab << scalarPtr << W() << ","    << std::endl;
-      }
-
-      if (qfField.usesIndices()) {
-        ss << tab << intPtr << indices() << "," << std::endl;
-      }
-
-      ss << std::endl;
+                                          getKernelProps(device));
     }
 
     //---[ Code ]-----------------------
@@ -162,14 +84,5 @@ namespace ceed {
       return ss2.str();
     }
     //==================================
-
-    ::occa::kernel OperatorKernelBuilder::build(const ::occa::device &device,
-                                                const std::string &qfunctionFilename,
-                                                const std::string &qfunctionName,
-                                                const CeedInt Q,
-                                                const OperatorArgs &args) {
-      OperatorKernelBuilder builder(qfunctionFilename, qfunctionName, Q, args);
-      return builder.buildKernel(device);
-    }
   }
 }

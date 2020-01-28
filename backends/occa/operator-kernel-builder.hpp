@@ -24,7 +24,8 @@
 namespace ceed {
   namespace occa {
     class OperatorKernelBuilder {
-     private:
+     protected:
+      const std::string kernelName;
       const std::string qfunctionFilename;
       const std::string qfunctionName;
       const CeedInt Q;
@@ -44,11 +45,9 @@ namespace ceed {
 
       ::occa::kernel buildKernel(::occa::device device);
 
-      void operatorKernelArguments();
-      void operatorKernelArgument(const int index,
-                                  const bool isInput,
-                                  const OperatorField &opField,
-                                  const QFunctionField &qfField);
+      virtual void generateKernel(::occa::device device) = 0;
+
+      virtual ::occa::properties getKernelProps(::occa::device device) = 0;
 
       //---[ Code ]---------------------
       void indent();
@@ -102,12 +101,6 @@ namespace ceed {
                            const int index,
                            const std::string &arrayIndex);
       //================================
-
-      static ::occa::kernel build(const ::occa::device &device,
-                                  const std::string &qfunctionFilename,
-                                  const std::string &qfunctionName,
-                                  const CeedInt Q,
-                                  const OperatorArgs &args);
     };
   }
 }

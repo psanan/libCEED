@@ -15,6 +15,8 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "gpu-operator.hpp"
+#include "gpu-operator-kernel-builder.hpp"
+#include "qfunction.hpp"
 
 
 namespace ceed {
@@ -24,8 +26,11 @@ namespace ceed {
     GpuOperator::~GpuOperator() {}
 
     ::occa::kernel GpuOperator::buildApplyKernel() {
-      // TODO: Implement
-      return ::occa::kernel();
+      return GpuOperatorKernelBuilder::build(getDevice(),
+                                             qfunction->filename,
+                                             qfunction->qFunctionName,
+                                             ceedQ,
+                                             args);
     }
 
     void GpuOperator::apply(Vector &in, Vector &out) {

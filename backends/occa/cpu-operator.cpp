@@ -15,6 +15,7 @@
 // testbed platforms, in support of the nation's exascale computing imperative.
 
 #include "cpu-operator.hpp"
+#include "cpu-operator-kernel-builder.hpp"
 #include "qfunction.hpp"
 
 
@@ -25,12 +26,11 @@ namespace ceed {
     CpuOperator::~CpuOperator() {}
 
     ::occa::kernel CpuOperator::buildApplyKernel() {
-      return ::occa::kernel();
-      // OperatorKernelBuilder::build(getDevice(),
-      //                              qfunction->filename,
-      //                              qfunction->qFunctionName,
-      //                              ceedQ,
-      //                              args);
+      return CpuOperatorKernelBuilder::build(getDevice(),
+                                             qfunction->filename,
+                                             qfunction->qFunctionName,
+                                             ceedQ,
+                                             args);
     }
 
     void CpuOperator::setupApply(Vector &in, Vector &out) {
