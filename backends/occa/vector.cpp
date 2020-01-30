@@ -213,7 +213,19 @@ namespace ceed {
     }
 
     int Vector::restoreArray(CeedScalar **array) {
-      return restoreArray((const CeedScalar**) array);
+      switch (syncState) {
+        case HOST_SYNC:
+        case BOTH_SYNC:
+        case NONE_SYNC:
+          copyArrayValues(CEED_MEM_HOST, *array);
+          return 0;
+
+        case DEVICE_SYNC:
+          copyArrayValues(CEED_MEM_DEVICE, *array);
+          return 0;
+      }
+
+      return CeedError(ceed, 1, "Invalid Vector syncState");
     }
 
     int Vector::restoreArray(const CeedScalar **array) {

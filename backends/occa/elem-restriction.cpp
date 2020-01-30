@@ -14,6 +14,8 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+#include <map>
+
 #include "./elem-restriction.hpp"
 #include "./vector.hpp"
 #include "./kernels/elem-restriction.okl"
@@ -158,10 +160,105 @@ namespace ceed {
       transposeOffsets_h[0] = 0;
 
       // Copy to device
-      transposeOffsets = getDevice().malloc<CeedInt>(offsetsCount,
-                                                     transposeOffsets_h);
-      transposeIndices = getDevice().malloc<CeedInt>(elementEntryCount,
-                                                     transposeIndices_h);
+      ::occa::device device = getDevice();
+
+      transposeOffsets = device.malloc<CeedInt>(offsetsCount,
+                                                transposeOffsets_h);
+      transposeIndices = device.malloc<CeedInt>(elementEntryCount,
+                                                transposeIndices_h);
+    }
+
+    void ElemRestriction::setupTransposeBlockIndices() {
+      if (transposeOffsets.isInitialized()) {
+        return;
+      }
+
+      if (hostIndices) {
+        setupTransposeBlockIndices(hostIndices);
+      } else {
+        // Use a temporary buffer to compute transpose indices
+        CeedInt *indices_h = new CeedInt[indices.length()];
+        indices.copyTo((void*) indices_h);
+
+        setupTransposeBlockIndices(indices_h);
+
+        delete [] indices_h;
+      }
+    }
+
+    void ElemRestriction::setupTransposeBlockIndices(const CeedInt *indices_h) {
+      std::vector<CeedInt> uOffsets, uIndices;
+      std::vector<CeedInt> vOffsets, vIndices;
+
+      uOffsets.push_back(0);
+      vOffsets.push_back(0);
+
+      for (int blockOffset = 0; blockOffset < ceedElementCount; blockOffset += ceedBlockSize) {
+        const int lastBlockElement = std::min(ceedBlockSize, ceedElementCount - blockOffset);
+
+        // Store element in charge of updating a given v node
+        std::map<int, int> vIndexElement;
+
+        // Store u nodes for a given v node
+        std::map<int, std::vector<int>> uIndicesMap;
+
+        // Store which element is in change of updating a given vIndex
+        std::vector<int> *elementToVIndex = new std::vector<int>[ceedBlockSize];
+
+        for (int blockElement = 0; blockElement < lastBlockElement; ++blockElement) {
+          for (int n = 0; n < ceedElementSize; ++n) {
+            const int indexOffset = blockElement + (n * ceedBlockSize);
+
+            const int uIndex = (
+              indexOffset
+            );
+            const int vIndex = indices_h[
+              (blockOffset * ceedElementSize)
+              + indexOffset
+            ];
+
+            vIndexElement[vIndex] = blockElement;
+            uIndicesMap[vIndex].push_back(uIndex);
+          }
+        }
+
+        // Transpose vIndex -> blockElement map
+        for (auto it = vIndexElement.begin(); it != vIndexElement.end(); ++it) {
+          const int vIndex = it->first;
+          const int ownerElement = it->second;
+          elementToVIndex[ownerElement].push_back(vIndex);
+        }
+
+        for (int blockElement = 0; blockElement < lastBlockElement; ++blockElement) {
+          const std::vector<int> &elementVIndices = elementToVIndex[blockElement];
+          const int vIndicesCount = (int) elementVIndices.size();
+
+          vOffsets.push_back(vOffsets.back() + vIndicesCount);
+
+          for (int vi = 0; vi < vIndicesCount; ++vi) {
+            const int vIndex = elementVIndices[vi];
+            const std::vector<int> &elementUIndices = uIndicesMap[vIndex];
+            const int uIndicesCount = (int) elementUIndices.size();
+
+            vIndices.push_back(vIndex);
+            uOffsets.push_back(uOffsets.back() + uIndicesCount);
+
+            for (int ui = 0; ui < uIndicesCount; ++ui) {
+              uIndices.push_back(elementUIndices[ui]);
+            }
+          }
+        }
+
+        delete [] elementToVIndex;
+      }
+
+      // Copy to device
+      ::occa::device device = getDevice();
+
+      blockedTransposeUOffsets = device.malloc<CeedInt>(uOffsets.size(), uOffsets.data());
+      blockedTransposeVOffsets = device.malloc<CeedInt>(vOffsets.size(), vOffsets.data());
+      blockedTransposeUIndices = device.malloc<CeedInt>(uIndices.size(), uIndices.data());
+      blockedTransposeVIndices = device.malloc<CeedInt>(vIndices.size(), vIndices.data());
     }
 
     ElemRestriction* ElemRestriction::from(CeedElemRestriction r) {
@@ -230,6 +327,7 @@ namespace ceed {
 
       if (rIsTransposed) {
         setupTransposeIndices();
+
         apply(transposeOffsets,
               transposeIndices,
               u.getConstKernelArg(),
@@ -272,12 +370,14 @@ namespace ceed {
                                        (CeedInt) (firstElement + ceedBlockSize));
 
       if (rIsTransposed) {
-        return CeedError(ceed, 1, "Blocked apply not supported yet for transposed v");
+        setupTransposeBlockIndices();
 
         apply(firstElement,
               lastElement,
-              // offsets,
-              indices,
+              blockedTransposeUOffsets,
+              blockedTransposeVOffsets,
+              blockedTransposeUIndices,
+              blockedTransposeVIndices,
               u.getConstKernelArg(),
               v.getKernelArg());
       } else {

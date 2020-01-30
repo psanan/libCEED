@@ -39,8 +39,15 @@ namespace ceed {
       // Owned resources
       bool freeIndices;
       ::occa::memory indices;
+
       ::occa::memory transposeOffsets;
       ::occa::memory transposeIndices;
+
+      ::occa::memory blockedTransposeUOffsets;
+      ::occa::memory blockedTransposeVOffsets;
+      ::occa::memory blockedTransposeUIndices;
+      ::occa::memory blockedTransposeVIndices;
+
       ::occa::kernelBuilder applyWithRTransposeKernelBuilder;
       ::occa::kernelBuilder applyWithoutRTransposeKernelBuilder;
       ::occa::kernelBuilder applyBlockedWithRTransposeKernelBuilder;
@@ -64,6 +71,9 @@ namespace ceed {
 
       void setupTransposeIndices();
       void setupTransposeIndices(const CeedInt *indices_h);
+
+      void setupTransposeBlockIndices();
+      void setupTransposeBlockIndices(const CeedInt *indices_h);
 
       static ElemRestriction* from(CeedElemRestriction r);
       static ElemRestriction* from(CeedOperatorField operatorField);
