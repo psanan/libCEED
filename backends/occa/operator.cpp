@@ -29,7 +29,7 @@ namespace ceed {
         ceedQ(0),
         ceedElementCount(0),
         qfunction(NULL),
-        hasInitialSetup(false) {}
+        needsInitialSetup(true) {}
 
     Operator::~Operator() {}
 
@@ -69,9 +69,9 @@ namespace ceed {
         }
       }
 
-      if (!hasInitialSetup) {
-        initialSetup(in, out);
-        hasInitialSetup = true;
+      if (needsInitialSetup) {
+        initialSetup();
+        needsInitialSetup = false;
       }
 
       apply(in, out);
@@ -80,7 +80,7 @@ namespace ceed {
     }
 
     //---[ Virtual Methods ]------------
-    void Operator::initialSetup(Vector &in, Vector &out) {}
+    void Operator::initialSetup() {}
 
     //---[ Ceed Callbacks ]-------------
     int Operator::registerOperatorFunction(Ceed ceed, CeedOperator op,
@@ -96,7 +96,7 @@ namespace ceed {
       Operator *operator_ = (
         (Context::from(ceed)->usingCpuDevice())
         ? ((Operator*) new CpuOperator())
-        : ((Operator*) new GpuOperator())
+        : ((Operator*) new CpuOperator()) // TODO: Use GpuOperator
       );
 
       ierr = CeedOperatorSetData(op, (void**) &operator_); CeedChk(ierr);

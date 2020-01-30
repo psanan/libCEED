@@ -25,15 +25,7 @@ namespace ceed {
 
     CpuOperator::~CpuOperator() {}
 
-    ::occa::kernel CpuOperator::buildApplyKernel() {
-      return CpuOperatorKernelBuilder::build(getDevice(),
-                                             qfunction->filename,
-                                             qfunction->qFunctionName,
-                                             ceedQ,
-                                             args);
-    }
-
-    void CpuOperator::initialSetup(Vector &in, Vector &out) {
+    void CpuOperator::initialSetup() {
       // ierr = CeedCalloc(numinputfields + numoutputfields, &impl->blkrestr);
       // CeedChk(ierr);
       // ierr = CeedCalloc(numinputfields + numoutputfields, &impl->evecs);
@@ -64,6 +56,18 @@ namespace ceed {
 
     void CpuOperator::apply(Vector &in, Vector &out) {
       setupApply(in, out);
+      apply(args)
+      // Loop through elements
+      // Output restriction
+      // Restore input arrays
+    }
+
+    ::occa::kernel CpuOperator::buildApplyKernel() {
+      return CpuOperatorKernelBuilder::build(getDevice(),
+                                             qfunction->filename,
+                                             qfunction->qFunctionName,
+                                             ceedQ,
+                                             args);
     }
   }
 }

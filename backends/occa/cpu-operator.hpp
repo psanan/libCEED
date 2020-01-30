@@ -30,13 +30,13 @@ namespace ceed {
 
       ~CpuOperator();
 
-      ::occa::kernel buildApplyKernel();
-
-      void initialSetup(Vector &in, Vector &out);
+      void initialSetup();
 
       void setupApply(Vector &in, Vector &out);
 
       void apply(Vector &in, Vector &out);
+
+      ::occa::kernel buildApplyKernel();
     };
   }
 }
