@@ -26,18 +26,18 @@
 // - CeedScalar
 //
 // Expects the following constants to be defined:
-// - COMPONENT_COUNT : CeedInt
-// - ELEMENT_SIZE    : CeedInt
-// - NODE_COUNT      : CeedInt
-// - TILE_SIZE       : int
-// - BLOCK_SIZE      : int     (applyBlocked)
-// - USES_INDICES    : bool
-// - U_IS_TRANSPOSED : bool
+// - COMPONENT_COUNT    : CeedInt
+// - ELEMENT_SIZE       : CeedInt
+// - NODE_COUNT         : CeedInt
+// - TILE_SIZE          : int
+// - BLOCK_SIZE         : int     (applyBlocked)
+// - USES_INDICES       : bool
+// - COMP_IS_FAST_INDEX : bool
 
 static std::string elemRestriction_source = STRINGIFY_SOURCE(
 
 @kernel
-void applyWithoutVTranspose(const CeedInt elementCount,
+void applyWithoutRTranspose(const CeedInt elementCount,
                             @restrict const CeedInt *indices,
                             @restrict const CeedScalar *u,
                             @restrict CeedScalar *v) {
@@ -57,7 +57,7 @@ void applyWithoutVTranspose(const CeedInt elementCount,
     );
 
     for (int c = 0; c < COMPONENT_COUNT; ++c) {
-@directive("#if U_IS_TRANSPOSED")
+@directive("#if COMP_IS_FAST_INDEX")
       v[vOffset + (c * ELEMENT_SIZE)] = u[c + (uOffset * COMPONENT_COUNT)];
 @directive("#else")
       v[vOffset + (c * ELEMENT_SIZE)] = u[uOffset + (c * NODE_COUNT)];
@@ -67,7 +67,7 @@ void applyWithoutVTranspose(const CeedInt elementCount,
 }
 
 @kernel
-void applyWithVTranspose(@restrict const CeedInt *offsets,
+void applyWithRTranspose(@restrict const CeedInt *offsets,
                          @restrict const CeedInt *indices,
                          @restrict const CeedScalar *u,
                          @restrict CeedScalar *v) {
@@ -87,7 +87,7 @@ void applyWithVTranspose(@restrict const CeedInt *offsets,
 
       const CeedInt uOffset = (
         // Element offset
-@directive("#if U_IS_TRANSPOSED")
+@directive("#if COMP_IS_FAST_INDEX")
         ((index / ELEMENT_SIZE) * (ELEMENT_SIZE * COMPONENT_COUNT))
 @directive("#else")
         ((index / ELEMENT_SIZE) * ELEMENT_SIZE)
@@ -97,7 +97,7 @@ void applyWithVTranspose(@restrict const CeedInt *offsets,
       );
 
       for (int c = 0; c < COMPONENT_COUNT; ++c) {
-@directive("#if U_IS_TRANSPOSED")
+@directive("#if COMP_IS_FAST_INDEX")
         vComp[c] += u[c + (uOffset * COMPONENT_COUNT)];
 @directive("#else")
         vComp[c] += u[uOffset + (c * ELEMENT_SIZE)];
@@ -115,12 +115,10 @@ void applyWithVTranspose(@restrict const CeedInt *offsets,
 
 static std::string elemRestrictionBlockedFunctions_source = STRINGIFY_SOURCE(
 
-inline void applyElementWithoutVTranspose(const CeedInt element,
+inline void applyElementWithoutRTranspose(const CeedInt element,
                                           @restrict const CeedInt *indices,
                                           @restrict const CeedScalar *u,
                                           @restrict CeedScalar *v) {
-  const int block = (element / BLOCK_SIZE) * BLOCK_SIZE;
-  const int vBlockOffset = block * ELEMENT_SIZE * COMPONENT_COUNT;
   for (int n = 0; n < ELEMENT_SIZE; ++n) {
 @directive("#if USES_INDICES")
     const CeedInt uOffset = indices[(element * ELEMENT_SIZE) + n];
@@ -133,16 +131,64 @@ inline void applyElementWithoutVTranspose(const CeedInt element,
       element * (ELEMENT_SIZE * COMPONENT_COUNT)
       // Node offset
       + n
-      // Block offset
-      - vBlockOffset
     );
 
     for (int c = 0; c < COMPONENT_COUNT; ++c) {
-@directive("#if U_IS_TRANSPOSED")
+@directive("#if COMP_IS_FAST_INDEX")
       v[vOffset + (c * ELEMENT_SIZE)] = u[c + (uOffset * COMPONENT_COUNT)];
 @directive("#else")
       v[vOffset + (c * ELEMENT_SIZE)] = u[uOffset + (c * NODE_COUNT)];
 @directive("#endif")
+    }
+  }
+}
+
+inline void applyElementWithRTranspose(const CeedInt element,
+                                       @restrict const CeedInt *offsets,
+                                       @restrict const CeedInt *indices,
+                                       @restrict const CeedScalar *u,
+                                       @restrict CeedScalar *v) {
+  for (int n = 0; n < ELEMENT_SIZE; ++n) {
+    const CeedInt offsetStart = offsets[(element * ELEMENT_SIZE) + n];
+    const CeedInt offsetEnd = offsets[(element * ELEMENT_SIZE) + n + 1];
+
+    CeedScalar vComp[COMPONENT_COUNT];
+    for (int c = 0; c < COMPONENT_COUNT; ++c) {
+      vComp[c] = 0;
+    }
+
+    for (CeedInt i = offsetStart; i < offsetEnd; ++i) {
+      const CeedInt index = indices[i];
+
+      const CeedInt vOffset = (
+        // Element offset
+        element * (ELEMENT_SIZE * COMPONENT_COUNT)
+        // Node offset
+        + (index % ELEMENT_SIZE)
+      );
+
+      const CeedInt uOffset = (
+        // Element offset
+@directive("#if COMP_IS_FAST_INDEX")
+        ((index / ELEMENT_SIZE) * (ELEMENT_SIZE * COMPONENT_COUNT))
+@directive("#else")
+        ((index / ELEMENT_SIZE) * ELEMENT_SIZE)
+@directive("#endif")
+        // Node offset
+        + (index % ELEMENT_SIZE)
+      );
+
+      for (int c = 0; c < COMPONENT_COUNT; ++c) {
+@directive("#if COMP_IS_FAST_INDEX")
+        vComp[c] += u[c + (uOffset * COMPONENT_COUNT)];
+@directive("#else")
+        vComp[c] += u[uOffset + (c * ELEMENT_SIZE)];
+@directive("#endif")
+      }
+
+      for (int c = 0; c < COMPONENT_COUNT; ++c) {
+        v[vOffset + (c * ELEMENT_SIZE)] += vComp[c];
+      }
     }
   }
 }
@@ -155,14 +201,31 @@ static std::string elemRestrictionBlocked_source = (
   + STRINGIFY_SOURCE(
 
 @kernel
-void applyWithoutVTranspose(const int firstElement,
+void applyWithoutRTranspose(const int firstElement,
                             const int lastElement,
                             @restrict const CeedInt *indices,
                             @restrict const CeedScalar *u,
                             @restrict CeedScalar *v) {
   @tile(BLOCK_SIZE, @outer, @inner)
   for (int e = firstElement; e < lastElement; ++e) {
-    applyElementWithoutVTranspose(e, indices, u, v);
+    const int block = (e / BLOCK_SIZE) * BLOCK_SIZE;
+    const int blockOffset = block * ELEMENT_SIZE * COMPONENT_COUNT;
+    applyElementWithoutRTranspose(e, indices, u, v - blockOffset);
+  }
+}
+
+@kernel
+void applyWithRTranspose(const int firstElement,
+                         const int lastElement,
+                         @restrict const CeedInt *offsets,
+                         @restrict const CeedInt *indices,
+                         @restrict const CeedScalar *u,
+                         @restrict CeedScalar *v) {
+  @tile(BLOCK_SIZE, @outer, @inner)
+  for (int e = firstElement; e < lastElement; ++e) {
+    const int block = (e / BLOCK_SIZE) * BLOCK_SIZE;
+    const int blockOffset = block * ELEMENT_SIZE * COMPONENT_COUNT;
+    applyElementWithRTranspose(e, offsets, indices, u - blockOffset, v);
   }
 }
 

@@ -41,10 +41,10 @@ namespace ceed {
       ::occa::memory indices;
       ::occa::memory transposeOffsets;
       ::occa::memory transposeIndices;
-      ::occa::kernelBuilder applyWithVTransposeKernelBuilder;
-      ::occa::kernelBuilder applyWithoutVTransposeKernelBuilder;
-      ::occa::kernelBuilder applyBlockedWithVTransposeKernelBuilder;
-      ::occa::kernelBuilder applyBlockedWithoutVTransposeKernelBuilder;
+      ::occa::kernelBuilder applyWithRTransposeKernelBuilder;
+      ::occa::kernelBuilder applyWithoutRTransposeKernelBuilder;
+      ::occa::kernelBuilder applyBlockedWithRTransposeKernelBuilder;
+      ::occa::kernelBuilder applyBlockedWithoutRTransposeKernelBuilder;
 
       ElemRestriction();
 
@@ -68,20 +68,20 @@ namespace ceed {
       static ElemRestriction* from(CeedElemRestriction r);
       static ElemRestriction* from(CeedOperatorField operatorField);
 
-      ::occa::kernel buildApplyKernel(const bool uIsTransposed,
-                                      const bool vIsTransposed);
+      ::occa::kernel buildApplyKernel(const bool rIsTransposed,
+                                      const bool compIsFastIndex);
 
-      int apply(CeedTransposeMode vTransposeMode,
+      int apply(CeedTransposeMode rTransposeMode,
                 CeedTransposeMode uTransposeMode,
                 Vector &u,
                 Vector &v,
                 CeedRequest *request);
 
-      ::occa::kernel buildApplyBlockedKernel(const bool uIsTransposed,
-                                           const bool vIsTransposed);
+      ::occa::kernel buildApplyBlockedKernel(const bool rIsTransposed,
+                                             const bool compIsFastIndex);
 
       int applyBlock(CeedInt block,
-                     CeedTransposeMode vTransposeMode,
+                     CeedTransposeMode rTransposeMode,
                      CeedTransposeMode uTransposeMode,
                      Vector &u,
                      Vector &v,

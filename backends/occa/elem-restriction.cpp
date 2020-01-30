@@ -89,24 +89,23 @@ namespace ceed {
       kernelProps["defines/TILE_SIZE"]       = 64;
       kernelProps["defines/USES_INDICES"]    = indices.isInitialized();
 
-      applyWithVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
-        elemRestriction_source, "applyWithVTranspose", kernelProps
+      applyWithRTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestriction_source, "applyWithRTranspose", kernelProps
       );
 
-      applyWithoutVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
-        elemRestriction_source, "applyWithoutVTranspose", kernelProps
+      applyWithoutRTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestriction_source, "applyWithoutRTranspose", kernelProps
       );
 
       // Add block size
       kernelProps["defines/BLOCK_SIZE"] = ceedBlockSize;
 
-      // TODO: Implement
-      // applyBlockedWithVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
-      //   elemRestrictionBlocked_source, "applyWithVTranspose", kernelProps
-      // );
+      applyBlockedWithRTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestrictionBlocked_source, "applyWithRTranspose", kernelProps
+      );
 
-      applyBlockedWithoutVTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
-        elemRestrictionBlocked_source, "applyWithoutVTranspose", kernelProps
+      applyBlockedWithoutRTransposeKernelBuilder = ::occa::kernelBuilder::fromString(
+        elemRestrictionBlocked_source, "applyWithoutRTranspose", kernelProps
       );
     }
 
@@ -207,29 +206,29 @@ namespace ceed {
       return from(ceedElemRestriction);
     }
 
-    ::occa::kernel ElemRestriction::buildApplyKernel(const bool uIsTransposed,
-                                                     const bool vIsTransposed) {
+    ::occa::kernel ElemRestriction::buildApplyKernel(const bool rIsTransposed,
+                                                     const bool compIsFastIndex) {
       ::occa::properties kernelProps;
-      kernelProps["defines/U_IS_TRANSPOSED"] = uIsTransposed;
+      kernelProps["defines/COMP_IS_FAST_INDEX"] = compIsFastIndex;
 
       return (
-        vIsTransposed
-        ? applyWithVTransposeKernelBuilder.build(getDevice(), kernelProps)
-        : applyWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps)
+        rIsTransposed
+        ? applyWithRTransposeKernelBuilder.build(getDevice(), kernelProps)
+        : applyWithoutRTransposeKernelBuilder.build(getDevice(), kernelProps)
       );
     }
 
-    int ElemRestriction::apply(CeedTransposeMode vTransposeMode,
+    int ElemRestriction::apply(CeedTransposeMode rTransposeMode,
                                CeedTransposeMode uTransposeMode,
                                Vector &u,
                                Vector &v,
                                CeedRequest *request) {
-      const bool uIsTransposed = (uTransposeMode != CEED_NOTRANSPOSE);
-      const bool vIsTransposed = (vTransposeMode != CEED_NOTRANSPOSE);
+      const bool rIsTransposed = (rTransposeMode != CEED_NOTRANSPOSE);
+      const bool compIsFastIndex = (uTransposeMode != CEED_NOTRANSPOSE);
 
-      ::occa::kernel apply = buildApplyKernel(uIsTransposed, vIsTransposed);
+      ::occa::kernel apply = buildApplyKernel(rIsTransposed, compIsFastIndex);
 
-      if (vIsTransposed) {
+      if (rIsTransposed) {
         setupTransposeIndices();
         apply(transposeOffsets,
               transposeIndices,
@@ -245,44 +244,49 @@ namespace ceed {
       return 0;
     }
 
-    ::occa::kernel ElemRestriction::buildApplyBlockedKernel(const bool uIsTransposed,
-                                                            const bool vIsTransposed) {
+    ::occa::kernel ElemRestriction::buildApplyBlockedKernel(const bool rIsTransposed,
+                                                            const bool compIsFastIndex) {
       ::occa::properties kernelProps;
-      kernelProps["defines/U_IS_TRANSPOSED"] = uIsTransposed;
+      kernelProps["defines/COMP_IS_FAST_INDEX"] = compIsFastIndex;
 
-      // return (
-      //   vIsTransposed
-      //   ? applyBlockedWithVTransposeKernelBuilder.build(getDevice(), kernelProps)
-      //   : applyBlockedWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps)
-      // );
-
-      return applyBlockedWithoutVTransposeKernelBuilder.build(getDevice(), kernelProps);
+      return (
+        rIsTransposed
+        ? applyBlockedWithRTransposeKernelBuilder.build(getDevice(), kernelProps)
+        : applyBlockedWithoutRTransposeKernelBuilder.build(getDevice(), kernelProps)
+      );
     }
 
     int ElemRestriction::applyBlock(CeedInt block,
-                                    CeedTransposeMode vTransposeMode,
+                                    CeedTransposeMode rTransposeMode,
                                     CeedTransposeMode uTransposeMode,
                                     Vector &u,
                                     Vector &v,
                                     CeedRequest *request) {
-      const bool uIsTransposed = (uTransposeMode != CEED_NOTRANSPOSE);
-      const bool vIsTransposed = (vTransposeMode != CEED_NOTRANSPOSE);
+      const bool rIsTransposed = (rTransposeMode != CEED_NOTRANSPOSE);
+      const bool compIsFastIndex = (uTransposeMode != CEED_NOTRANSPOSE);
 
-      if (vIsTransposed) {
-        return CeedError(ceed, 1, "Blocked apply not supported yet for transposed v");
-      }
-
-      ::occa::kernel apply = buildApplyBlockedKernel(uIsTransposed, vIsTransposed);
+      ::occa::kernel apply = buildApplyBlockedKernel(rIsTransposed, compIsFastIndex);
 
       const int firstElement = block * ceedBlockSize;
       const int lastElement = std::min(ceedElementCount,
                                        (CeedInt) (firstElement + ceedBlockSize));
 
-      apply(firstElement,
-            lastElement,
-            indices,
-            u.getConstKernelArg(),
-            v.getKernelArg());
+      if (rIsTransposed) {
+        return CeedError(ceed, 1, "Blocked apply not supported yet for transposed v");
+
+        apply(firstElement,
+              lastElement,
+              // offsets,
+              indices,
+              u.getConstKernelArg(),
+              v.getKernelArg());
+      } else {
+        apply(firstElement,
+              lastElement,
+              indices,
+              u.getConstKernelArg(),
+              v.getKernelArg());
+      }
 
       return 0;
     }
