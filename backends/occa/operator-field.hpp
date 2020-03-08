@@ -33,7 +33,6 @@ namespace ceed {
       Vector *vec;
       Basis *basis;
       ElemRestriction *elemRestriction;
-      bool isTransposed;
 
       OperatorField(CeedOperatorField opField);
 

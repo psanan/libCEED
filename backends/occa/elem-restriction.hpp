@@ -31,6 +31,7 @@ namespace ceed {
       CeedInt ceedNodeCount;
       CeedInt ceedComponentCount;
       CeedInt ceedBlockSize;
+      CeedInterlaceMode ceedInterlaceMode;
 
       // Passed resources
       bool freeHostIndices;
@@ -82,7 +83,6 @@ namespace ceed {
                                       const bool compIsFastIndex);
 
       int apply(CeedTransposeMode rTransposeMode,
-                CeedTransposeMode uTransposeMode,
                 Vector &u,
                 Vector &v,
                 CeedRequest *request);
@@ -92,7 +92,6 @@ namespace ceed {
 
       int applyBlock(CeedInt block,
                      CeedTransposeMode rTransposeMode,
-                     CeedTransposeMode uTransposeMode,
                      Vector &u,
                      Vector &v,
                      CeedRequest *request);
@@ -107,12 +106,11 @@ namespace ceed {
                             CeedElemRestriction r);
 
       static int ceedApply(CeedElemRestriction r,
-                           CeedTransposeMode tmode, CeedTransposeMode lmode,
+                           CeedTransposeMode tmode,
                            CeedVector u, CeedVector v, CeedRequest *request);
 
       static int ceedApplyBlock(CeedElemRestriction r,
-                                CeedInt block,
-                                CeedTransposeMode tmode, CeedTransposeMode lmode,
+                                CeedInt block, CeedTransposeMode tmode,
                                 CeedVector u, CeedVector v, CeedRequest *request);
 
       static int ceedDestroy(CeedElemRestriction r);

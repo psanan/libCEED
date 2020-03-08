@@ -30,7 +30,6 @@ namespace ceed {
 
       CeedBasis ceedBasis;
       CeedVector ceedVector;
-      CeedTransposeMode ceedTransposeMode;
       CeedElemRestriction ceedElemRestriction;
       int ierr = 0;
 
@@ -38,9 +37,6 @@ namespace ceed {
       CeedOccaValidChk(_isValid, ierr);
 
       ierr = CeedOperatorFieldGetVector(opField, &ceedVector);
-      CeedOccaValidChk(_isValid, ierr);
-
-      ierr = CeedOperatorFieldGetLMode(opField, &ceedTransposeMode);
       CeedOccaValidChk(_isValid, ierr);
 
       ierr = CeedOperatorFieldGetElemRestriction(opField, &ceedElemRestriction);
@@ -51,7 +47,6 @@ namespace ceed {
       vec = Vector::from(ceedVector);
       basis = Basis::from(ceedBasis);
       elemRestriction = ElemRestriction::from(ceedElemRestriction);
-      isTransposed = (ceedTransposeMode != CEED_NOTRANSPOSE);
     }
 
     bool OperatorField::isValid() const {

@@ -28,6 +28,7 @@ namespace ceed {
         ceedNodeCount(0),
         ceedComponentCount(0),
         ceedBlockSize(0),
+        ceedInterlaceMode(CEED_NONINTERLACED),
         freeHostIndices(true),
         hostIndices(NULL),
         freeIndices(true) {}
@@ -287,6 +288,12 @@ namespace ceed {
       ierr = CeedElemRestrictionGetBlockSize(r, &elemRestriction->ceedBlockSize);
       CeedOccaFromChk(ierr);
 
+      elemRestriction->ceedInterlaceMode = CEED_NONINTERLACED;
+      if (elemRestriction->hostIndices) {
+        ierr = CeedElemRestrictionGetIMode(r, &elemRestriction->ceedInterlaceMode);
+        CeedOccaFromChk(ierr);
+      }
+
       // Set to at least 1
       elemRestriction->ceedBlockSize = std::max(1, elemRestriction->ceedBlockSize);
 
@@ -316,12 +323,11 @@ namespace ceed {
     }
 
     int ElemRestriction::apply(CeedTransposeMode rTransposeMode,
-                               CeedTransposeMode uTransposeMode,
                                Vector &u,
                                Vector &v,
                                CeedRequest *request) {
       const bool rIsTransposed = (rTransposeMode != CEED_NOTRANSPOSE);
-      const bool compIsFastIndex = (uTransposeMode != CEED_NOTRANSPOSE);
+      const bool compIsFastIndex = (ceedInterlaceMode != CEED_NONINTERLACED);
 
       ::occa::kernel apply = buildApplyKernel(rIsTransposed, compIsFastIndex);
 
@@ -356,12 +362,11 @@ namespace ceed {
 
     int ElemRestriction::applyBlock(CeedInt block,
                                     CeedTransposeMode rTransposeMode,
-                                    CeedTransposeMode uTransposeMode,
                                     Vector &u,
                                     Vector &v,
                                     CeedRequest *request) {
       const bool rIsTransposed = (rTransposeMode != CEED_NOTRANSPOSE);
-      const bool compIsFastIndex = (uTransposeMode != CEED_NOTRANSPOSE);
+      const bool compIsFastIndex = (ceedInterlaceMode != CEED_NONINTERLACED);
 
       ::occa::kernel apply = buildApplyBlockedKernel(rIsTransposed, compIsFastIndex);
 
@@ -431,8 +436,7 @@ namespace ceed {
       return 0;
     }
 
-    int ElemRestriction::ceedApply(CeedElemRestriction r,
-                                   CeedTransposeMode tmode, CeedTransposeMode lmode,
+    int ElemRestriction::ceedApply(CeedElemRestriction r, CeedTransposeMode tmode,
                                    CeedVector u, CeedVector v, CeedRequest *request) {
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
@@ -448,12 +452,11 @@ namespace ceed {
         return CeedError(elemRestriction->ceed, 1, "Incorrect CeedVector argument: v");
       }
 
-      return elemRestriction->apply(tmode, lmode, *uVector, *vVector, request);
+      return elemRestriction->apply(tmode, *uVector, *vVector, request);
     }
 
     int ElemRestriction::ceedApplyBlock(CeedElemRestriction r,
-                                        CeedInt block,
-                                        CeedTransposeMode tmode, CeedTransposeMode lmode,
+                                        CeedInt block, CeedTransposeMode tmode,
                                         CeedVector u, CeedVector v, CeedRequest *request) {
       ElemRestriction *elemRestriction = ElemRestriction::from(r);
       Vector *uVector = Vector::from(u);
@@ -469,7 +472,7 @@ namespace ceed {
         return CeedError(elemRestriction->ceed, 1, "Incorrect CeedVector argument: v");
       }
 
-      return elemRestriction->applyBlock(block, tmode, lmode, *uVector, *vVector, request);
+      return elemRestriction->applyBlock(block, tmode, *uVector, *vVector, request);
     }
 
     int ElemRestriction::ceedDestroy(CeedElemRestriction r) {

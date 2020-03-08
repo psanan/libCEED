@@ -56,7 +56,7 @@ namespace ceed {
 
     void CpuOperator::apply(Vector &in, Vector &out) {
       setupApply(in, out);
-      apply(args)
+      // apply(args);
       // Loop through elements
       // Output restriction
       // Restore input arrays
