@@ -820,14 +820,10 @@ int main(int argc, char **argv) {
     user->VecRestoreArray = VecRestoreArray;
     user->VecRestoreArrayRead = VecRestoreArrayRead;
   } else {
-    // *INDENT-OFF*
-    #ifdef PETSC_HAVE_CUDA
     user->VecGetArray = VecCUDAGetArray;
     user->VecGetArrayRead = VecCUDAGetArrayRead;
     user->VecRestoreArray = VecCUDARestoreArray;
     user->VecRestoreArrayRead = VecCUDARestoreArrayRead;
-    #endif
-    // *INDENT-ON*
   }
 
   ierr = MatCreateShell(comm, mnodes[0]*mnodes[1]*mnodes[2]*ncompu,

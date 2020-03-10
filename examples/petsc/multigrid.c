@@ -304,11 +304,7 @@ int main(int argc, char **argv) {
   if (memtyperequested == CEED_MEM_HOST) {
     ierr = VecGetArray(rhsloc, &r); CHKERRQ(ierr);
   } else {
-    // *INDENT-OFF*
-    #ifdef PETSC_HAVE_CUDA
     ierr = VecCUDAGetArray(rhsloc, &r); CHKERRQ(ierr);
-    #endif
-    // *INDENT-ON*
   }
   CeedVectorCreate(ceed, xlsize[numlevels-1], &rhsceed);
   CeedVectorSetArray(rhsceed, CEED_MEM_HOST, CEED_USE_POINTER, r);
@@ -337,11 +333,7 @@ int main(int argc, char **argv) {
   if (memtyperequested == CEED_MEM_HOST) {
     ierr = VecRestoreArray(rhsloc, &r); CHKERRQ(ierr);
   } else {
-    // *INDENT-OFF*
-    #ifdef PETSC_HAVE_CUDA
     ierr = VecCUDARestoreArray(rhsloc, &r); CHKERRQ(ierr);
-    #endif
-    // *INDENT-ON*
   }
   ierr = VecZeroEntries(rhs); CHKERRQ(ierr);
   ierr = DMLocalToGlobalBegin(dm[numlevels-1], rhsloc, ADD_VALUES, rhs);
@@ -433,14 +425,10 @@ int main(int argc, char **argv) {
       userO[i]->VecRestoreArray = VecRestoreArray;
       userO[i]->VecRestoreArrayRead = VecRestoreArrayRead;
     } else {
-      // *INDENT-OFF*
-      #ifdef PETSC_HAVE_CUDA
       userO[i]->VecGetArray = VecCUDAGetArray;
       userO[i]->VecGetArrayRead = VecCUDAGetArrayRead;
       userO[i]->VecRestoreArray = VecCUDARestoreArray;
       userO[i]->VecRestoreArrayRead = VecCUDARestoreArrayRead;
-      #endif
-      // *INDENT-ON*
     }
 
     // Set up diagonal
