@@ -191,11 +191,7 @@ int main(int argc, char **argv) {
                               (void(*)(void))MatMult_Ceed);
   CHKERRQ(ierr);
   if (memtyperequested == CEED_MEM_DEVICE) {
-    // *INDENT-OFF*
-    #if PETSC_VERSION_GT(3,13,0)
     ierr = MatShellSetVecType(matO, VECCUDA); CHKERRQ(ierr);
-    #endif
-    // *INDENT-ON*
   }
 
   // Print summary
@@ -313,16 +309,12 @@ int main(int argc, char **argv) {
     PC pc;
     ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
     ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr);
-    // *INDENT-OFF*
-    #if PETSC_VERSION_GT(3,13,0)
     if (bpChoice == CEED_BP1 || bpChoice == CEED_BP2) {
       ierr = PCSetType(pc, PCJACOBI); CHKERRQ(ierr);
       ierr = PCJacobiSetType(pc, PC_JACOBI_ROWSUM); CHKERRQ(ierr);
     } else {
       ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr);
     }
-    #endif
-    // *INDENT-ON*
     ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
     ierr = KSPSetNormType(ksp, KSP_NORM_NATURAL); CHKERRQ(ierr);
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,

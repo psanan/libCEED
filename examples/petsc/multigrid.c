@@ -231,11 +231,7 @@ int main(int argc, char **argv) {
                                 (void(*)(void))MatGetDiag);
     CHKERRQ(ierr);
     if (memtyperequested == CEED_MEM_DEVICE) {
-    // *INDENT-OFF*
-      #if PETSC_VERSION_GT(3,13,0)
       ierr = MatShellSetVecType(matO[i], VECCUDA); CHKERRQ(ierr);
-      #endif
-    // *INDENT-ON*
     }
 
     // Level transfers
@@ -248,11 +244,7 @@ int main(int argc, char **argv) {
                                   (void(*)(void))MatMult_Interp);
       CHKERRQ(ierr);
       if (memtyperequested == CEED_MEM_DEVICE) {
-        // *INDENT-OFF*
-        #if PETSC_VERSION_GT(3,13,0)
         ierr = MatShellSetVecType(matI[i], VECCUDA); CHKERRQ(ierr);
-        #endif
-        // *INDENT-ON*
       }
 
       // Restrict
@@ -263,11 +255,7 @@ int main(int argc, char **argv) {
                                   (void(*)(void))MatMult_Restrict);
       CHKERRQ(ierr);
       if (memtyperequested == CEED_MEM_DEVICE) {
-        // *INDENT-OFF*
-        #if PETSC_VERSION_GT(3,13,0)
         ierr = MatShellSetVecType(matR[i], VECCUDA); CHKERRQ(ierr);
-        #endif
-        // *INDENT-ON*
       }
     }
   }
