@@ -255,10 +255,6 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                             appCtx->meshFile, appCtx->meshFile,
                             sizeof(appCtx->meshFile), &meshFileFlag);
   CHKERRQ(ierr);
-  #if !defined(PETSC_HAVE_EXODUSII)
-  SETERRQ(comm, PETSC_ERR_ARG_WRONG,
-          "ExodusII support needed. Reconfigure your Arch with --download-exodusii");
-  #endif
 
   ierr = PetscOptionsEnum("-problem",
                           "Solves Elasticity & Hyperelasticity Problems",
@@ -302,8 +298,12 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr); // End of setting AppCtx
 
-  // Check for all required values set
+  // Check for all required values set and Exodus-II support
   if (!appCtx->testMode) {
+    #if !defined(PETSC_HAVE_EXODUSII)
+    SETERRQ(comm, PETSC_ERR_ARG_WRONG,
+            "ExodusII support needed. Reconfigure your Arch with --download-exodusii");
+    #endif
     if(!degreeFalg) {
       ierr = PetscPrintf(comm, "-degree option needed\n\n"); CHKERRQ(ierr);
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
