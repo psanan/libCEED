@@ -51,9 +51,13 @@ petsc:
 ns:
 	make CEED_DIR=$(CEED_DIR) PETSC_DIR=$(PETSC_DIR) PETSC_ARCH=$(PETSC_ARCH) -C navier-stokes all
 
+solids:
+	make CEED_DIR=$(CEED_DIR) PETSC_DIR=$(PETSC_DIR) PETSC_ARCH=$(PETSC_ARCH) -C solid-mechanics all
+
 clean:
 	+make -C ceed clean
 	+make -C mfem clean
 	+make -C nek clean
 	+make -C petsc clean
 	+make -C navier-stokes clean
+	+make -C solid-mechanics clean
