@@ -28,6 +28,8 @@ elif [ ${1::4} == "nek-" ]; then
     allargs=$(grep -F "C TESTARGS" examples/nek/bps/${1:4}.usr* | cut -d\  -f3- )
 elif [ ${1::3} == "ns-" ]; then
     allargs=$(grep -F //TESTARGS examples/navier-stokes/${1:3}.c* | cut -d\  -f2- )
+elif [ ${1::3} == "solids-" ]; then
+    allargs=$(grep -F //TESTARGS examples/solid-mechanics/${1:3}.c* | cut -d\  -f2- )
 elif [ ${1::2} == "ex" ]; then
     # get all test configurations
     numconfig=$(grep -F //TESTARGS examples/ceed/$1.c* | wc -l)

@@ -304,17 +304,14 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
     SETERRQ(comm, PETSC_ERR_ARG_WRONG,
             "ExodusII support needed. Reconfigure your Arch with --download-exodusii");
     #endif
-    if(!degreeFalg) {
-      ierr = PetscPrintf(comm, "-degree option needed\n\n"); CHKERRQ(ierr);
-      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    if (!degreeFalg) {
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-degree option needed");
     }
-    if(!meshFileFlag) {
-      ierr = PetscPrintf(comm, "-mesh option needed (file)\n\n"); CHKERRQ(ierr);
-      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    if (!meshFileFlag) {
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-mesh option needed (file)");
     }
-    if(!boundaryFlag) {
-      ierr = PetscPrintf(comm, "-boundary option needed\n\n"); CHKERRQ(ierr);
-      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    if (!boundaryFlag) {
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-boundary option needed");
     }
   } else {
     appCtx->boundaryChoice = BDRY_MMS;
@@ -404,13 +401,11 @@ static int processPhysics(MPI_Comm comm, Physics phys, Units units) {
   ierr = PetscOptionsEnd(); CHKERRQ(ierr); // End of setting Physics
 
   // Check for all required options to be set
-  if(!nuFlag) {
-    ierr = PetscPrintf(comm, "-nu option needed\n\n"); CHKERRQ(ierr);
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "Poisson's ratio Error!");
+  if (!nuFlag) {
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-nu option needed");
   }
-  if(!YoungFlag) {
-    ierr = PetscPrintf(comm, "-E option needed\n\n"); CHKERRQ(ierr);
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "Young's Modulus Error!");
+  if (!YoungFlag) {
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-E option needed");
   }
 
   // Define derived units
