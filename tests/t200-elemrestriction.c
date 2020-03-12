@@ -31,11 +31,13 @@ int main(int argc, char **argv) {
   CeedElemRestrictionApply(r, CEED_NOTRANSPOSE, x, y, CEED_REQUEST_IMMEDIATE);
 
   CeedVectorGetArrayRead(y, CEED_MEM_HOST, &yy);
-  for (CeedInt i=0; i<ne*2; i++)
-    if (10+(i+1)/2 != yy[i])
+  for (CeedInt i=0; i<ne*2; i++) {
+    const CeedScalar real_yy = 10+(i+1)/2;
+    if (real_yy != yy[i])
       // LCOV_EXCL_START
-      printf("Error in restricted array y[%d] = %f",
-             i, (double)yy[i]);
+      printf("Error in restricted array y[%d] = %f != %f\n",
+             i, (double)yy[i], (double) real_yy);
+  }
   // LCOV_EXCL_STOP
   CeedVectorRestoreArrayRead(y, &yy);
 

@@ -107,7 +107,6 @@ LIBDIR := lib
 prefix ?= /usr/local
 bindir = $(prefix)/bin
 libdir = $(prefix)/lib
-okldir = $(libdir)/okl
 includedir = $(prefix)/include
 pkgconfigdir = $(libdir)/pkgconfig
 INSTALL = install
@@ -178,7 +177,7 @@ cuda-shared.cu := $(sort $(wildcard backends/cuda-shared/*.cu))
 cuda-gen.c     := $(sort $(wildcard backends/cuda-gen/*.c))
 cuda-gen.cpp   := $(sort $(wildcard backends/cuda-gen/*.cpp))
 cuda-gen.cu    := $(sort $(wildcard backends/cuda-gen/*.cu))
-occa.c         := $(sort $(wildcard backends/occa/*.c))
+occa.cpp       := $(sort $(wildcard backends/occa/*.cpp))
 magma_preprocessor := python backends/magma/gccm.py
 magma_pre_src  := $(filter-out %ceed-magma.c %_tmp.c, $(wildcard backends/magma/ceed-*.c))
 magma_dsrc     := $(wildcard backends/magma/magma_d*.c)
@@ -244,7 +243,7 @@ info:
 	$(info MEMCHK_STATUS = $(MEMCHK_STATUS)$(call backend_status,/cpu/self/memcheck/serial /cpu/sef/memcheck/blocked))
 	$(info AVX_STATUS    = $(AVX_STATUS)$(call backend_status,/cpu/self/avx/serial /cpu/self/avx/blocked))
 	$(info XSMM_DIR      = $(XSMM_DIR)$(call backend_status,/cpu/self/xsmm/serial /cpu/self/xsmm/blocked))
-	$(info OCCA_DIR      = $(OCCA_DIR)$(call backend_status,/cpu/occa /gpu/occa /omp/occa))
+	$(info OCCA_DIR      = $(OCCA_DIR)$(call backend_status,$(OCCA_BACKENDS)))
 	$(info MAGMA_DIR     = $(MAGMA_DIR)$(call backend_status,/gpu/magma))
 	$(info CUDA_DIR      = $(CUDA_DIR)$(call backend_status,$(CUDA_BACKENDS)))
 	$(info ------------------------------------)
@@ -255,7 +254,6 @@ info:
 	$(info prefix        = $(prefix))
 	$(info includedir    = $(value includedir))
 	$(info libdir        = $(value libdir))
-	$(info okldir        = $(value okldir))
 	$(info pkgconfigdir  = $(value pkgconfigdir))
 	$(info ------------------------------------)
 	@true
@@ -313,19 +311,21 @@ ifneq ($(wildcard $(XSMM_DIR)/lib/libxsmm.*),)
 endif
 
 # OCCA Backends
+OCCA_BACKENDS = /cpu/occa /gpu/occa /*/occa
 ifneq ($(wildcard $(OCCA_DIR)/lib/libocca.*),)
+  $(libceeds) : CPPFLAGS += -I$(OCCA_DIR)/include
   $(libceeds) : LDFLAGS += -L$(OCCA_DIR)/lib -Wl,-rpath,$(abspath $(OCCA_DIR)/lib)
   $(libceeds) : LDLIBS += -locca
-  libceed.c += $(occa.c)
-  $(occa.c:%.c=$(OBJDIR)/%.o) $(occa.c:%=%.tidy) : CPPFLAGS += -I$(OCCA_DIR)/include
-  BACKENDS += /cpu/occa /gpu/occa /omp/occa
+  $(libceeds) : LINK = $(CXX)
+  libceed.cpp += $(occa.cpp)
+  BACKENDS += $(OCCA_BACKENDS)
 endif
 
 # CUDA Backends
-CUDA_LIB_DIR := $(wildcard $(foreach d,lib lib64,$(CUDA_DIR)/$d/libcudart.${SO_EXT}))
-CUDA_LIB_DIR := $(patsubst %/,%,$(dir $(firstword $(CUDA_LIB_DIR))))
-CUDA_LIB_DIR_STUBS := $(CUDA_LIB_DIR)/stubs
-CUDA_BACKENDS = /gpu/cuda/ref /gpu/cuda/reg /gpu/cuda/shared /gpu/cuda/gen
+# CUDA_LIB_DIR := $(wildcard $(foreach d,lib lib64,$(CUDA_DIR)/$d/libcudart.${SO_EXT}))
+# CUDA_LIB_DIR := $(patsubst %/,%,$(dir $(firstword $(CUDA_LIB_DIR))))
+# CUDA_LIB_DIR_STUBS := $(CUDA_LIB_DIR)/stubs
+# CUDA_BACKENDS = /gpu/cuda/ref /gpu/cuda/reg /gpu/cuda/shared /gpu/cuda/gen
 ifneq ($(CUDA_LIB_DIR),)
   $(libceeds) : CFLAGS += -I$(CUDA_DIR)/include
   $(libceeds) : CPPFLAGS += -I$(CUDA_DIR)/include
@@ -489,25 +489,15 @@ $(OBJDIR)/ceed.pc : pkgconfig-prefix = $(prefix)
 %/ceed.pc : ceed.pc.template | $$(@D)/.DIR
 	@sed "s:%prefix%:$(pkgconfig-prefix):" $< > $@
 
-OCCA        := $(OCCA_DIR)/bin/occa
-OKL_KERNELS := $(wildcard backends/occa/*.okl)
-
-okl-cache :
-	$(OCCA) cache ceed $(OKL_KERNELS)
-
-okl-clear:
-	$(OCCA) clear -y -l ceed
-
 install : $(libceed) $(OBJDIR)/ceed.pc
 	$(INSTALL) -d $(addprefix $(if $(DESTDIR),"$(DESTDIR)"),"$(includedir)"\
-	  "$(libdir)" "$(pkgconfigdir)" $(if $(OCCA_ON),"$(okldir)"))
+	  "$(libdir)" "$(pkgconfigdir)"
 	$(INSTALL_DATA) include/ceed.h "$(DESTDIR)$(includedir)/"
 	$(INSTALL_DATA) include/ceedf.h "$(DESTDIR)$(includedir)/"
 	$(INSTALL_DATA) $(libceed) "$(DESTDIR)$(libdir)/"
 	$(INSTALL_DATA) $(OBJDIR)/ceed.pc "$(DESTDIR)$(pkgconfigdir)/"
-	$(if $(OCCA_ON),$(INSTALL_DATA) $(OKL_KERNELS) "$(DESTDIR)$(okldir)/")
 
-.PHONY : cln clean doxygen doc lib install all print test tst prove prv prove-all junit examples style tidy okl-cache okl-clear info info-backends
+.PHONY : cln clean doc doxygen lib install all print test tst prove prv prove-all junit examples style tidy okl-cache okl-clear info info-backends
 
 cln clean :
 	$(RM) -r $(OBJDIR) $(LIBDIR) dist *egg* .pytest_cache *cffi*
